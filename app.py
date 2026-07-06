@@ -3,12 +3,12 @@ import pandas as pd
 from io import StringIO
 import os
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 import base64
 
 st.set_page_config(page_title="Kupony Dashboard", layout="wide")
-st.title("📊 Garnek z kapustą")
+st.title("Garnek z kapustą")
 
 MIESIACE_PL = {1:"Styczeń",2:"Luty",3:"Marzec",4:"Kwiecień",5:"Maj",6:"Czerwiec",
                7:"Lipiec",8:"Sierpień",9:"Wrzesień",10:"Październik",11:"Listopad",12:"Grudzień"}
@@ -83,8 +83,28 @@ czerwiec_data = """Data,Sport,Rozgrywki,Mecz,Rynek,Pewnosc,Stawka,Kurs,Godzina,S
 30.06.2026,Pilka,MS R32,Ivory Coast vs Norway,Over 2.5,Sredni,1.00,1.80,18:00,WYGRANA
 """
 
+lipiec_data = """Data,Sport,Rozgrywki,Mecz,Rynek,Pewnosc,Stawka,Kurs,Godzina,Status
+01.07.2026,Pilka,MS 2026 R32,England vs DR Congo,England -1.5,Ryzykowny,0.50,1.89,17:00,PRZEGRANA
+01.07.2026,Pilka,MS 2026 R32,Belgium vs Senegal,Belgium ML,Sredni,1.00,2.10,21:00,WYGRANA
+01.07.2026,Pilka,MS 2026 R32,Belgium vs Senegal,BTTS Yes,Sredni,1.00,1.80,21:00,WYGRANA
+01.07.2026,Pilka,MS 2026 R32,USA vs Bosnia & Herz.,Under 2.5 gole,Ryzykowny,0.50,2.08,01:00 (2.VII),WYGRANA
+02.07.2026,Pilka,MS 2026 R32,Spain vs Austria,Under 2.5 gole,Sredni,1.00,1.80,20:00,PRZEGRANA
+03.07.2026,Pilka,MS 2026 R32,Switzerland vs Algeria,BTTS Yes,Sredni,1.00,1.80,04:00 (3.VII),PRZEGRANA
+03.07.2026,Pilka,MS 2026 R32,Australia vs Egypt,BTTS Yes,Ryzykowny,0.50,2.00,19:00 (3.VII),WYGRANA
+04.07.2026,Pilka,MS 2026 R32,Colombia vs Ghana,Over 2.5,Sredni,1.00,1.90,01:30 (4.VII),PRZEGRANA
+05.07.2026,Pilka,MS 2026 R16,Canada vs Morocco,Under 2.5 gole,Ryzykowny,0.50,1.75,18:00,PRZEGRANA
+05.07.2026,Pilka,MS 2026 R16,Paraguay vs France,France -1.5,Sredni,1.00,1.62,22:00,PRZEGRANA
+05.07.2026,Pilka,Friendly/MS,Brazil vs Norway,Over 2.5 gole,Sredni,1.00,1.73,20:00,WYGRANA
+05.07.2026,Pilka,Friendly/MS,Mexico vs England,Under 1.5 gole,Ryzykowny,0.50,2.85,01:00 (06.07),PRZEGRANA
+06.07.2026,Pilka,MS 2026,Portugal vs Spain,Spain Win (90 min),Pewny,1.50,1.87,20:00,OPEN
+06.07.2026,Pilka,MS 2026,USA vs Belgium,Over 2.5 gole,Sredni,1.00,1.95,01:00 (07.07),OPEN
+"""
+
 df_czerwiec = pd.read_csv(StringIO(czerwiec_data))
 df_czerwiec["Analiza"] = ""
+
+df_lipiec = pd.read_csv(StringIO(lipiec_data))
+df_lipiec["Analiza"] = ""
 
 content, sha_a = github_get("analizy.csv")
 if content:
@@ -133,50 +153,8 @@ if len(df_analizy) > 0:
 
     df_analizy = df_analizy.drop(columns=["data_dt"])
 
-df_archiwum_full = pd.concat([df_czerwiec, df_archiwum], ignore_index=True, sort=False)
+df_archiwum_full = pd.concat([df_czerwiec, df_lipiec, df_archiwum], ignore_index=True, sort=False)
 df_archiwum_full["Data_dt"] = pd.to_datetime(df_archiwum_full["Data"], format="%d.%m.%Y", errors="coerce")
-
-wygrane = df_archiwum_full[df_archiwum_full["Status"] == "WYGRANA"]
-przegrane = df_archiwum_full[df_archiwum_full["Status"] == "PRZEGRANA"]
-rozliczone = df_archiwum_full[df_archiwum_full["Status"].isin(["WYGRANA", "PRZEGRANA"])]
-
-zysk = (wygrane["Stawka"] * wygrane["Kurs"]).sum() - wygrane["Stawka"].sum() - przegrane["Stawka"].sum()
-suma_stawek = rozliczone["Stawka"].sum()
-yield_pct = (zysk / suma_stawek * 100) if suma_stawek > 0 else 0
-sredni_kurs = rozliczone["Kurs"].mean() if len(rozliczone) > 0 else 0
-
-rozliczone_sorted = rozliczone.sort_values("Data_dt")
-statusy_seria = rozliczone_sorted["Status"].tolist()
-
-streak_count = 0
-streak_type = None
-for s in reversed(statusy_seria):
-    if streak_type is None:
-        streak_type = s
-        streak_count = 1
-    elif s == streak_type:
-        streak_count += 1
-    else:
-        break
-
-if streak_type == "WYGRANA":
-    streak_label = f"🔥 {streak_count} wygrane z rzędu"
-elif streak_type == "PRZEGRANA":
-    streak_label = f"❄️ {streak_count} przegrane z rzędu"
-else:
-    streak_label = "brak serii"
-
-col1, col2, col3, col4, col5, col6 = st.columns(6)
-col1.metric("Liczba kuponów", len(df_archiwum_full))
-win_rate = len(wygrane) / (len(wygrane) + len(przegrane)) * 100 if (len(wygrane) + len(przegrane)) > 0 else 0
-col2.metric("Win rate", f"{win_rate:.0f}%")
-col3.metric("Suma stawek", f"£{suma_stawek:.2f}")
-col4.metric("Zysk / strata netto", f"£{zysk:+.2f}")
-col5.metric("Yield (ROI)", f"{yield_pct:+.1f}%")
-col6.metric("Aktualna seria", streak_label)
-
-st.caption(f"Średni kurs zagranych kuponów: {sredni_kurs:.2f}")
-st.divider()
 
 def koloruj_status(val):
     if val == "WYGRANA":
@@ -187,6 +165,42 @@ def koloruj_status(val):
         return "background-color: #4a4a1e; color: white;"
     else:
         return "background-color: #3a3a3a; color: white;"
+
+st.subheader("📊 Statystyki")
+zakres_wyboru = st.selectbox("Przedział czasowy", ["Ostatnie 7 dni", "Ostatni miesiąc", "Cały okres"], index=2)
+
+dzis = pd.Timestamp(datetime.today().date())
+if zakres_wyboru == "Ostatnie 7 dni":
+    data_od = dzis - timedelta(days=7)
+elif zakres_wyboru == "Ostatni miesiąc":
+    data_od = dzis - timedelta(days=30)
+else:
+    data_od = None
+
+if data_od is not None:
+    df_stats = df_archiwum_full[df_archiwum_full["Data_dt"] >= data_od]
+else:
+    df_stats = df_archiwum_full
+
+wygrane = df_stats[df_stats["Status"] == "WYGRANA"]
+przegrane = df_stats[df_stats["Status"] == "PRZEGRANA"]
+rozliczone = df_stats[df_stats["Status"].isin(["WYGRANA", "PRZEGRANA"])]
+
+zysk = (wygrane["Stawka"] * wygrane["Kurs"]).sum() - wygrane["Stawka"].sum() - przegrane["Stawka"].sum()
+suma_stawek = rozliczone["Stawka"].sum()
+yield_pct = (zysk / suma_stawek * 100) if suma_stawek > 0 else 0
+sredni_kurs = rozliczone["Kurs"].mean() if len(rozliczone) > 0 else 0
+
+col1, col2, col3, col4, col5 = st.columns(5)
+col1.metric("Liczba kuponów", len(df_stats))
+win_rate = len(wygrane) / (len(wygrane) + len(przegrane)) * 100 if (len(wygrane) + len(przegrane)) > 0 else 0
+col2.metric("Win rate", f"{win_rate:.0f}%")
+col3.metric("Suma stawek", f"£{suma_stawek:.2f}")
+col4.metric("Zysk / strata netto", f"£{zysk:+.2f}")
+col5.metric("Yield (ROI)", f"{yield_pct:+.1f}%")
+
+st.caption(f"Średni kurs zagranych kuponów: {sredni_kurs:.2f}")
+st.divider()
 
 st.subheader("📚 Zapisane typy i analizy")
 st.caption("Widoczne: 6 najnowszych typów + wszystkie ze statusem OPEN. Starsze rozliczone trafiają do archiwum.")
@@ -254,7 +268,7 @@ with st.container():
                 "stawka": f"{stawka_input:.2f}",
                 "kurs": f"{kurs_input_analiza:.2f}",
                 "wynik": "OPEN",
-                "analiza": analiza_input.replace("\\n", " ").strip()
+                "analiza": analiza_input.replace("\n", " ").strip()
             }])
 
             content_now, sha_now = github_get("analizy.csv")
@@ -278,11 +292,11 @@ st.subheader("💰 Kalkulator bezpiecznej stawki")
 st.write("Wpisz swój aktualny bank, a system podliczy bezpieczną stawkę na podstawie zasad ochrony kapitału.")
 
 bank_bazowy = 28.0
-stawki_bazowe = {"Pewny": 1.50, "Średni": 1.00, "Ryzykowny": 0.50}
+stawki_bazowe = {"Pewny": 1.50, "Sredni": 1.00, "Ryzykowny": 0.50}
 
 col_bank1, col_bank2 = st.columns(2)
 bank_uzytkownika = col_bank1.number_input("Twój aktualny bank (GBP)", min_value=1.0, value=28.0, step=1.0)
-pewnosc_bank_input = col_bank2.selectbox("Poziom pewności zakładu", ["Pewny", "Średni", "Ryzykowny"])
+pewnosc_bank_input = col_bank2.selectbox("Poziom pewności zakładu", ["Pewny", "Sredni", "Ryzykowny"])
 
 if st.button("Policz stawkę"):
     wspolczynnik = bank_uzytkownika / bank_bazowy
@@ -296,7 +310,7 @@ if st.button("Policz stawkę"):
     )
     st.caption(
         "To przeliczenie bazuje na zasadzie, że przy banku 28 GBP stawki wynoszą: "
-        "Pewny 1.50 GBP, Średni 1.00 GBP, Ryzykowny 0.50 GBP — czyli od 1.8% do 5.4% banku, "
+        "Pewny 1.50 GBP, Sredni 1.00 GBP, Ryzykowny 0.50 GBP — czyli od 1.8% do 5.4% banku, "
         "zależnie od poziomu pewności."
     )
 
