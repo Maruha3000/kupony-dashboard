@@ -151,3 +151,57 @@ if st.button("Policz stawkę"):
         "Pewny 1.50 GBP, Średni 1.00 GBP, Ryzykowny 0.50 GBP — czyli od 1.8% do 5.4% banku, "
         "zależnie od poziomu pewności."
     )
+    import csv
+from datetime import datetime
+import os
+
+st.divider()
+st.subheader("✏️ Dodaj nowy typ i analizę")
+
+st.write("Wpisz dane kuponu oraz swoją analizę. Zostaną zapisane do archiwum w pliku analizy.csv w repozytorium.")
+
+col1, col2 = st.columns(2)
+data_input = col1.date_input("Data meczu", value=datetime.today())
+sport_input = col2.text_input("Sport", value="Pilka")
+
+mecz_input = st.text_input("Mecz", placeholder="np. Barcelona vs Inter")
+rynek_input_analiza = st.text_input("Rynek", placeholder="np. Over/Under 2.5")
+pewnosc_input_analiza = st.selectbox("Poziom pewności", ["Pewny", "Sredni", "Ryzykowny"])
+stawka_input = st.number_input("Stawka (GBP)", min_value=0.0, step=0.5)
+kurs_input_analiza = st.number_input("Kurs WH", min_value=1.0, step=0.01)
+
+wynik_input = st.selectbox("Status kuponu", ["OPEN", "WYGRANA", "PRZEGRANA"])
+
+analiza_input = st.text_area(
+    "Twoja analiza (opis po ludzku)",
+    placeholder="Tutaj wklej swoją analizę meczu w zwykłym języku..."
+)
+
+if st.button("Zapisz typ i analizę"):
+    if not mecz_input or not analiza_input:
+        st.error("Uzupełnij co najmniej nazwę meczu i analizę.")
+    else:
+        row = [
+            data_input.strftime("%Y-%m-%d"),
+            sport_input,
+            mecz_input,
+            rynek_input_analiza,
+            pewnosc_input_analiza,
+            f"{stawka_input:.2f}",
+            f"{kurs_input_analiza:.2f}",
+            wynik_input,
+            analiza_input.replace("\n", " ").strip()
+        ]
+
+        file_path = "analizy.csv"
+
+        file_exists = os.path.exists(file_path)
+        with open(file_path, "a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            if not file_exists:
+                writer.writerow(
+                    ["data", "sport", "mecz", "rynek", "pewnosc", "stawka", "kurs", "wynik", "analiza"]
+                )
+            writer.writerow(row)
+
+        st.success("Typ i analiza zostały zapisane do archiwum.")
