@@ -45,18 +45,24 @@ data = """Data,Sport,Rozgrywki,Mecz,Rynek,Pewnosc,Stawka,Kurs,Godzina,Status
 
 df = pd.read_csv(StringIO(data))
 
-bank_start = 28.0
 wygrane = df[df["Status"] == "WYGRANA"]
 przegrane = df[df["Status"] == "PRZEGRANA"]
-zysk = (wygrane["Stawka"] * wygrane["Kurs"]).sum() - wygrane["Stawka"].sum() - przegrane["Stawka"].sum()
-bank_current = bank_start + zysk
+rozliczone = df[df["Status"].isin(["WYGRANA", "PRZEGRANA"])]
 
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Bank startowy", f"£{bank_start:.2f}")
-col2.metric("Bank aktualny", f"£{bank_current:.2f}", f"{zysk:+.2f}")
-col3.metric("Liczba kuponów", len(df))
+zysk = (wygrane["Stawka"] * wygrane["Kurs"]).sum() - wygrane["Stawka"].sum() - przegrane["Stawka"].sum()
+suma_stawek = rozliczone["Stawka"].sum()
+yield_pct = (zysk / suma_stawek * 100) if suma_stawek > 0 else 0
+sredni_kurs = rozliczone["Kurs"].mean() if len(rozliczone) > 0 else 0
+
+col1, col2, col3, col4, col5 = st.columns(5)
+col1.metric("Liczba kuponów", len(df))
 win_rate = len(wygrane) / (len(wygrane) + len(przegrane)) * 100 if (len(wygrane) + len(przegrane)) > 0 else 0
-col4.metric("Win rate", f"{win_rate:.0f}%")
+col2.metric("Win rate", f"{win_rate:.0f}%")
+col3.metric("Suma stawek", f"£{suma_stawek:.2f}")
+col4.metric("Zysk / strata netto", f"£{zysk:+.2f}")
+col5.metric("Yield (ROI)", f"{yield_pct:+.1f}%")
+
+st.caption(f"Średni kurs zagranych kuponów: {sredni_kurs:.2f}")
 
 st.subheader("Filtry")
 c1, c2 = st.columns(2)
