@@ -336,7 +336,8 @@ if len(dostepne_miesiace) > 0:
     )
 else:
     st.info("Brak danych archiwalnych.")
-  st.divider()
+
+st.divider()
 st.subheader("🔒 Zmień status kuponu")
 st.caption("Zmiana statusu wymaga podania kodu PIN. Dotyczy typów widocznych w sekcji 'Zapisane typy i analizy'.")
 
@@ -383,5 +384,3 @@ if len(df_analizy) > 0:
                     st.error(f"Błąd zapisu do GitHub: {r2.status_code} — {r2.text}")
 else:
     st.info("Brak kuponów do edycji.")
-
-
