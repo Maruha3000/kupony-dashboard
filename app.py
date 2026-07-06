@@ -63,123 +63,8 @@ col4.metric("Zysk / strata netto", f"£{zysk:+.2f}")
 col5.metric("Yield (ROI)", f"{yield_pct:+.1f}%")
 
 st.caption(f"Średni kurs zagranych kuponów: {sredni_kurs:.2f}")
-
-st.subheader("Filtry")
-c1, c2 = st.columns(2)
-sport_filter = c1.multiselect("Sport", options=df["Sport"].unique(), default=df["Sport"].unique())
-status_filter = c2.multiselect("Status", options=df["Status"].unique(), default=df["Status"].unique())
-
-df_filtered = df[df["Sport"].isin(sport_filter) & df["Status"].isin(status_filter)]
-
-st.subheader("Wszystkie kupony - czerwiec 2026")
-st.dataframe(df_filtered, use_container_width=True)
 st.divider()
 
-st.subheader("💰 Kalkulator bezpiecznej stawki")
-
-st.write("Wpisz swój aktualny bank, a system podliczy bezpieczną stawkę na podstawie zasad ochrony kapitału.")
-
-bank_bazowy = 28.0
-stawki_bazowe = {"Pewny": 1.50, "Średni": 1.00, "Ryzykowny": 0.50}
-
-c6, c7 = st.columns(2)
-bank_uzytkownika = c6.number_input("Twój aktualny bank (GBP)", min_value=1.0, value=28.0, step=1.0)
-pewnosc_input = c7.selectbox("Poziom pewności zakładu", ["Pewny", "Średni", "Ryzykowny"])
-
-if st.button("Policz stawkę"):
-    wspolczynnik = bank_uzytkownika / bank_bazowy
-    stawka_rekomendowana = round(stawki_bazowe[pewnosc_input] * wspolczynnik, 2)
-    procent_banku = round((stawka_rekomendowana / bank_uzytkownika) * 100, 1)
-
-    st.success(
-        f"Przy banku {bank_uzytkownika:.2f} GBP i pewności '{pewnosc_input}', "
-        f"bezpieczna stawka to około **{stawka_rekomendowana} GBP** "
-        f"(to około {procent_banku}% Twojego banku)."
-    )
-    st.caption(
-        "To przeliczenie bazuje na zasadzie, że przy banku 28 GBP stawki wynoszą: "
-        "Pewny 1.50 GBP, Średni 1.00 GBP, Ryzykowny 0.50 GBP — czyli od 1.8% do 5.4% banku, "
-        "zależnie od poziomu pewności."
-    )
-
-st.divider()
-st.subheader("✏️ Dodaj nowy typ i analizę")
-
-st.write("Wpisz dane kuponu oraz swoją analizę. Zostaną zapisane do archiwum w pliku analizy.csv w repozytorium.")
-
-col1, col2 = st.columns(2)
-data_input = col1.date_input("Data meczu", value=datetime.today())
-sport_input = col2.text_input("Sport", value="Pilka")
-
-mecz_input = st.text_input("Mecz", placeholder="np. Barcelona vs Inter")
-rynek_input_analiza = st.text_input("Rynek", placeholder="np. Over/Under 2.5")
-pewnosc_input_analiza = st.selectbox("Poziom pewności", ["Pewny", "Sredni", "Ryzykowny"])
-stawka_input = st.number_input("Stawka (GBP)", min_value=0.0, step=0.5)
-kurs_input_analiza = st.number_input("Kurs WH", min_value=1.0, step=0.01)
-
-wynik_input = st.selectbox("Status kuponu", ["OPEN", "WYGRANA", "PRZEGRANA"])
-
-analiza_input = st.text_area(
-    "Twoja analiza (opis po ludzku)",
-    placeholder="Tutaj wklej swoją analizę meczu w zwykłym języku..."
-)
-if st.button("Zapisz typ i analizę"):
-    if not mecz_input or not analiza_input:
-        st.error("Uzupełnij co najmniej nazwę meczu i analizę.")
-    else:
-        nowy_wiersz = {
-            "data": data_input.strftime("%Y-%m-%d"),
-            "sport": sport_input,
-            "mecz": mecz_input,
-            "rynek": rynek_input_analiza,
-            "pewnosc": pewnosc_input_analiza,
-            "stawka": f"{stawka_input:.2f}",
-            "kurs": f"{kurs_input_analiza:.2f}",
-            "wynik": wynik_input,
-            "analiza": analiza_input.replace("\n", " ").strip()
-        }
-
-        token = st.secrets["GITHUB_TOKEN"]
-        repo = "Maruha3000/kupony-dashboard"
-        path = "analizy.csv"
-        url = f"https://api.github.com/repos/{repo}/contents/{path}"
-        headers = {"Authorization": f"token {token}"}
-
-        r = requests.get(url, headers=headers)
-
-        if r.status_code == 200:
-            file_data = r.json()
-            sha = file_data["sha"]
-            content = base64.b64decode(file_data["content"]).decode("utf-8")
-        else:
-            sha = None
-            content = "data,sport,mecz,rynek,pewnosc,stawka,kurs,wynik,analiza\n"
-
-        nowa_linia = ",".join([
-            nowy_wiersz["data"], nowy_wiersz["sport"],
-            f'"{nowy_wiersz["mecz"]}"', f'"{nowy_wiersz["rynek"]}"',
-            nowy_wiersz["pewnosc"], nowy_wiersz["stawka"],
-            nowy_wiersz["kurs"], nowy_wiersz["wynik"],
-            f'"{nowy_wiersz["analiza"]}"'
-        ])
-
-        nowa_zawartosc = content.rstrip("\n") + "\n" + nowa_linia + "\n"
-        encoded_content = base64.b64encode(nowa_zawartosc.encode("utf-8")).decode("utf-8")
-
-        payload = {
-            "message": f"Dodano typ: {mecz_input}",
-            "content": encoded_content,
-            "sha": sha
-        }
-
-        r2 = requests.put(url, headers=headers, json=payload)
-
-        if r2.status_code in [200, 201]:
-            st.success("Typ i analiza zostały zapisane na GitHub.")
-        else:
-            st.error(f"Błąd zapisu do GitHub: {r2.status_code} — {r2.text}")
-
-        st.divider()
 st.subheader("📚 Zapisane typy i analizy")
 
 if os.path.exists("analizy.csv"):
@@ -190,28 +75,48 @@ else:
 if len(df_analizy) > 0:
     st.dataframe(df_analizy.sort_values("data", ascending=False), use_container_width=True)
 else:
-    st.info("Brak zapisanych analiz — dodaj pierwszy typ powyżej.")
+    st.info("Brak zapisanych analiz — dodaj pierwszy typ poniżej.")
 
 st.divider()
-st.subheader("🔒 Zmień status kuponu")
-st.caption("Zmiana statusu wymaga podania kodu PIN.")
+st.subheader("✏️ Dodaj nowy typ i analizę")
 
-if len(df_analizy) > 0:
-    opcje_meczow = df_analizy.apply(
-        lambda row: f"{row['data']} | {row['mecz']} | {row['rynek']} (aktualny status: {row['wynik']})",
-        axis=1
-    ).tolist()
+with st.container():
+    col_a, col_b = st.columns(2)
+    data_input = col_a.date_input("Data meczu", value=datetime.today())
+    sport_input = col_b.text_input("Sport", value="Pilka")
 
-    wybrany_mecz = st.selectbox("Wybierz kupon do zmiany", opcje_meczow)
-    nowy_status = st.selectbox("Nowy status", ["OPEN", "WYGRANA", "PRZEGRANA"])
-    pin_input = st.text_input("Kod PIN", type="password", max_chars=4)
+    col_c, col_d = st.columns(2)
+    mecz_input = col_c.text_input("Mecz", placeholder="np. Barcelona vs Inter")
+    rynek_input_analiza = col_d.text_input("Rynek", placeholder="np. Over/Under 2.5")
 
-    if st.button("Zapisz zmianę"):
-        if pin_input != st.secrets["APP_PIN"]:
-            st.error("Nieprawidłowy kod PIN. Zmiana nie została zapisana.")
+    col_e, col_f = st.columns(2)
+    pewnosc_input_analiza = col_e.selectbox("Poziom pewności", ["Pewny", "Sredni", "Ryzykowny"])
+    stawka_input = col_f.number_input("Stawka (GBP)", min_value=0.0, step=0.5)
+
+    col_g, col_h = st.columns(2)
+    kurs_input_analiza = col_g.number_input("Kurs WH", min_value=1.0, step=0.01)
+    wynik_input = col_h.selectbox("Status kuponu", ["OPEN", "WYGRANA", "PRZEGRANA"])
+
+    analiza_input = st.text_area(
+        "Twoja analiza (opis po ludzku)",
+        placeholder="Tutaj wklej swoją analizę meczu w zwykłym języku..."
+    )
+
+    if st.button("Zapisz typ i analizę"):
+        if not mecz_input or not analiza_input:
+            st.error("Uzupełnij co najmniej nazwę meczu i analizę.")
         else:
-            idx = opcje_meczow.index(wybrany_mecz)
-            df_analizy.loc[df_analizy.index[idx], "wynik"] = nowy_status
+            nowy_wiersz = {
+                "data": data_input.strftime("%Y-%m-%d"),
+                "sport": sport_input,
+                "mecz": mecz_input,
+                "rynek": rynek_input_analiza,
+                "pewnosc": pewnosc_input_analiza,
+                "stawka": f"{stawka_input:.2f}",
+                "kurs": f"{kurs_input_analiza:.2f}",
+                "wynik": wynik_input,
+                "analiza": analiza_input.replace("\n", " ").strip()
+            }
 
             token = st.secrets["GITHUB_TOKEN"]
             repo = "Maruha3000/kupony-dashboard"
@@ -220,15 +125,28 @@ if len(df_analizy) > 0:
             headers = {"Authorization": f"token {token}"}
 
             r = requests.get(url, headers=headers)
-            sha = r.json()["sha"] if r.status_code == 200 else None
 
-            csv_buffer = StringIO()
-            df_analizy.to_csv(csv_buffer, index=False)
-            nowa_zawartosc = csv_buffer.getvalue()
+            if r.status_code == 200:
+                file_data = r.json()
+                sha = file_data["sha"]
+                content = base64.b64decode(file_data["content"]).decode("utf-8")
+            else:
+                sha = None
+                content = "data,sport,mecz,rynek,pewnosc,stawka,kurs,wynik,analiza\n"
+
+            nowa_linia = ",".join([
+                nowy_wiersz["data"], nowy_wiersz["sport"],
+                f'"{nowy_wiersz["mecz"]}"', f'"{nowy_wiersz["rynek"]}"',
+                nowy_wiersz["pewnosc"], nowy_wiersz["stawka"],
+                nowy_wiersz["kurs"], nowy_wiersz["wynik"],
+                f'"{nowy_wiersz["analiza"]}"'
+            ])
+
+            nowa_zawartosc = content.rstrip("\n") + "\n" + nowa_linia + "\n"
             encoded_content = base64.b64encode(nowa_zawartosc.encode("utf-8")).decode("utf-8")
 
             payload = {
-                "message": f"Zmieniono status: {wybrany_mecz} -> {nowy_status}",
+                "message": f"Dodano typ: {mecz_input}",
                 "content": encoded_content,
                 "sha": sha
             }
@@ -236,8 +154,17 @@ if len(df_analizy) > 0:
             r2 = requests.put(url, headers=headers, json=payload)
 
             if r2.status_code in [200, 201]:
-                st.success(f"Status zaktualizowany na: {nowy_status}. Odśwież stronę, aby zobaczyć zmianę w tabeli.")
+                st.success("Typ i analiza zostały zapisane na GitHub.")
             else:
                 st.error(f"Błąd zapisu do GitHub: {r2.status_code} — {r2.text}")
-else:
-    st.info("Brak kuponów do edycji.")
+
+st.divider()
+st.subheader("Filtry")
+c1, c2 = st.columns(2)
+sport_filter = c1.multiselect("Sport", options=df["Sport"].unique(), default=df["Sport"].unique())
+status_filter = c2.multiselect("Status", options=df["Status"].unique(), default=df["Status"].unique())
+
+df_filtered = df[df["Sport"].isin(sport_filter) & df["Status"].isin(status_filter)]
+
+st.subheader("Wszystkie kupony - czerwiec 2026")
+st.dataframe(df_filtered, use_container_width=True)
