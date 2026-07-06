@@ -80,6 +80,27 @@ else:
 st.divider()
 st.subheader("✏️ Dodaj nowy typ i analizę")
 
+opcje_rynkow = [
+    "1X2 - Gospodarze",
+    "1X2 - Remis",
+    "1X2 - Gość",
+    "Over 0.5", "Under 0.5",
+    "Over 1.5", "Under 1.5",
+    "Over 2.5", "Under 2.5",
+    "Over 3.5", "Under 3.5",
+    "Over 4.5", "Under 4.5",
+    "BTTS Yes", "BTTS No",
+    "Handicap -1", "Handicap -1.5", "Handicap -2",
+    "Handicap +1", "Handicap +1.5", "Handicap +2",
+    "Double Chance 1X", "Double Chance X2", "Double Chance 12",
+    "Win to Nil - Gospodarze", "Win to Nil - Gość",
+    "Correct Score",
+    "Zwycięzca meczu (ML)",
+    "Over/Under sety", "Over/Under gemy",
+    "Over/Under punkty", "Over/Under goli w hokeju",
+    "Inne"
+]
+
 with st.container():
     col_a, col_b = st.columns(2)
     data_input = col_a.date_input("Data meczu", value=datetime.today())
@@ -87,7 +108,7 @@ with st.container():
 
     col_c, col_d = st.columns(2)
     mecz_input = col_c.text_input("Mecz", placeholder="np. Barcelona vs Inter")
-    rynek_input_analiza = col_d.text_input("Rynek", placeholder="np. Over/Under 2.5")
+    rynek_input_analiza = col_d.selectbox("Rynek", opcje_rynkow)
 
     col_e, col_f = st.columns(2)
     pewnosc_input_analiza = col_e.selectbox("Poziom pewności", ["Pewny", "Sredni", "Ryzykowny"])
@@ -168,3 +189,53 @@ df_filtered = df[df["Sport"].isin(sport_filter) & df["Status"].isin(status_filte
 
 st.subheader("Wszystkie kupony - czerwiec 2026")
 st.dataframe(df_filtered, use_container_width=True)
+
+st.divider()
+st.subheader("🔒 Zmień status kuponu")
+st.caption("Zmiana statusu wymaga podania kodu PIN.")
+
+if len(df_analizy) > 0:
+    opcje_meczow = df_analizy.apply(
+        lambda row: f"{row['data']} | {row['mecz']} | {row['rynek']} (aktualny status: {row['wynik']})",
+        axis=1
+    ).tolist()
+
+    wybrany_mecz = st.selectbox("Wybierz kupon do zmiany", opcje_meczow)
+    nowy_status = st.selectbox("Nowy status", ["OPEN", "WYGRANA", "PRZEGRANA"])
+    pin_input = st.text_input("Kod PIN", type="password", max_chars=4)
+
+    if st.button("Zapisz zmianę"):
+        if pin_input != st.secrets["APP_PIN"]:
+            st.error("Nieprawidłowy kod PIN. Zmiana nie została zapisana.")
+        else:
+            idx = opcje_meczow.index(wybrany_mecz)
+            df_analizy.loc[df_analizy.index[idx], "wynik"] = nowy_status
+
+            token = st.secrets["GITHUB_TOKEN"]
+            repo = "Maruha3000/kupony-dashboard"
+            path = "analizy.csv"
+            url = f"https://api.github.com/repos/{repo}/contents/{path}"
+            headers = {"Authorization": f"token {token}"}
+
+            r = requests.get(url, headers=headers)
+            sha = r.json()["sha"] if r.status_code == 200 else None
+
+            csv_buffer = StringIO()
+            df_analizy.to_csv(csv_buffer, index=False)
+            nowa_zawartosc = csv_buffer.getvalue()
+            encoded_content = base64.b64encode(nowa_zawartosc.encode("utf-8")).decode("utf-8")
+
+            payload = {
+                "message": f"Zmieniono status: {wybrany_mecz} -> {nowy_status}",
+                "content": encoded_content,
+                "sha": sha
+            }
+
+            r2 = requests.put(url, headers=headers, json=payload)
+
+            if r2.status_code in [200, 201]:
+                st.success(f"Status zaktualizowany na: {nowy_status}. Odśwież stronę, aby zobaczyć zmianę w tabeli.")
+            else:
+                st.error(f"Błąd zapisu do GitHub: {r2.status_code} — {r2.text}")
+else:
+    st.info("Brak kuponów do edycji.")
