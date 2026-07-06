@@ -1,14 +1,40 @@
 import streamlit as st
 import pandas as pd
 from io import StringIO
-import csv
 import os
 import random
 from datetime import datetime
 import requests
 import base64
+
 st.set_page_config(page_title="Kupony Dashboard", layout="wide")
 st.title("📊 Garnek z kapustą")
+
+MIESIACE_PL = {1:"Styczeń",2:"Luty",3:"Marzec",4:"Kwiecień",5:"Maj",6:"Czerwiec",
+               7:"Lipiec",8:"Sierpień",9:"Wrzesień",10:"Październik",11:"Listopad",12:"Grudzień"}
+
+def github_get(path):
+    token = st.secrets["GITHUB_TOKEN"]
+    repo = "Maruha3000/kupony-dashboard"
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {"Authorization": f"token {token}"}
+    r = requests.get(url, headers=headers)
+    if r.status_code == 200:
+        file_data = r.json()
+        content = base64.b64decode(file_data["content"]).decode("utf-8")
+        return content, file_data["sha"]
+    return None, None
+
+def github_put(path, content_str, sha, message):
+    token = st.secrets["GITHUB_TOKEN"]
+    repo = "Maruha3000/kupony-dashboard"
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {"Authorization": f"token {token}"}
+    encoded = base64.b64encode(content_str.encode("utf-8")).decode("utf-8")
+    payload = {"message": message, "content": encoded}
+    if sha:
+        payload["sha"] = sha
+    return requests.put(url, headers=headers, json=payload)
 
 cytaty_dnia = [
     "Dyscyplina bije emocje. Zawsze.",
@@ -23,7 +49,7 @@ cytaty_dnia = [
 random.seed(datetime.today().strftime("%Y-%m-%d"))
 st.info(f"💡 {random.choice(cytaty_dnia)}")
 
-data = """Data,Sport,Rozgrywki,Mecz,Rynek,Pewnosc,Stawka,Kurs,Godzina,Status
+czerwiec_data = """Data,Sport,Rozgrywki,Mecz,Rynek,Pewnosc,Stawka,Kurs,Godzina,Status
 03.06.2026,Pilka,Friendly,Poland vs Nigeria,Over 2.5 goli,Ryzykowny,0.50,2.00,19:45,WYGRANA
 03.06.2026,Tenis,ATP Roland Garros,Berrettini vs Arnaldi,Berrettini to win,Ryzykowny,0.50,1.50,19:15,PRZEGRANA
 03.06.2026,Hokej,NHL SCF G2,Vegas vs Carolina,Carolina ML,Ryzykowny,0.50,1.95,01:00,WYGRANA
@@ -57,20 +83,69 @@ data = """Data,Sport,Rozgrywki,Mecz,Rynek,Pewnosc,Stawka,Kurs,Godzina,Status
 30.06.2026,Pilka,MS R32,Ivory Coast vs Norway,Over 2.5,Sredni,1.00,1.80,18:00,WYGRANA
 """
 
-df = pd.read_csv(StringIO(data))
+df_czerwiec = pd.read_csv(StringIO(czerwiec_data))
+df_czerwiec["Analiza"] = ""
 
-wygrane = df[df["Status"] == "WYGRANA"]
-przegrane = df[df["Status"] == "PRZEGRANA"]
-rozliczone = df[df["Status"].isin(["WYGRANA", "PRZEGRANA"])]
+content, sha_a = github_get("analizy.csv")
+if content:
+    df_analizy = pd.read_csv(StringIO(content))
+else:
+    df_analizy = pd.DataFrame(columns=["data","sport","mecz","rynek","pewnosc","stawka","kurs","wynik","analiza"])
+    sha_a = None
+
+arch_cols = ["Data","Sport","Rozgrywki","Mecz","Rynek","Pewnosc","Stawka","Kurs","Godzina","Status","Analiza"]
+content_arch, sha_arch = github_get("archiwum.csv")
+if content_arch:
+    df_archiwum = pd.read_csv(StringIO(content_arch))
+else:
+    df_archiwum = pd.DataFrame(columns=arch_cols)
+    sha_arch = None
+
+if len(df_analizy) > 0:
+    df_analizy["data_dt"] = pd.to_datetime(df_analizy["data"], format="%Y-%m-%d", errors="coerce")
+    df_analizy = df_analizy.sort_values("data_dt", ascending=False).reset_index(drop=True)
+
+    top6_idx = df_analizy.index[:6].tolist()
+    open_idx = df_analizy.index[df_analizy["wynik"] == "OPEN"].tolist()
+    keep_idx = sorted(set(top6_idx) | set(open_idx))
+    move_idx = [i for i in df_analizy.index if i not in keep_idx]
+
+    if len(move_idx) > 0:
+        do_przeniesienia = df_analizy.loc[move_idx].copy()
+        nowe_wiersze = []
+        for _, row in do_przeniesienia.iterrows():
+            data_fmt = row["data_dt"].strftime("%d.%m.%Y") if pd.notna(row["data_dt"]) else row["data"]
+            nowe_wiersze.append({
+                "Data": data_fmt, "Sport": row["sport"], "Rozgrywki": "",
+                "Mecz": row["mecz"], "Rynek": row["rynek"], "Pewnosc": row["pewnosc"],
+                "Stawka": row["stawka"], "Kurs": row["kurs"], "Godzina": "-",
+                "Status": row["wynik"], "Analiza": row.get("analiza", "")
+            })
+        df_archiwum = pd.concat([df_archiwum, pd.DataFrame(nowe_wiersze)], ignore_index=True)
+        df_analizy = df_analizy.loc[keep_idx].reset_index(drop=True)
+
+        buf1 = StringIO(); df_archiwum.to_csv(buf1, index=False)
+        github_put("archiwum.csv", buf1.getvalue(), sha_arch, "Auto-archiwizacja starych typow")
+
+        df_analizy_zapis = df_analizy.drop(columns=["data_dt"])
+        buf2 = StringIO(); df_analizy_zapis.to_csv(buf2, index=False)
+        github_put("analizy.csv", buf2.getvalue(), sha_a, "Usunieto zarchiwizowane typy")
+
+    df_analizy = df_analizy.drop(columns=["data_dt"])
+
+df_archiwum_full = pd.concat([df_czerwiec, df_archiwum], ignore_index=True, sort=False)
+df_archiwum_full["Data_dt"] = pd.to_datetime(df_archiwum_full["Data"], format="%d.%m.%Y", errors="coerce")
+
+wygrane = df_archiwum_full[df_archiwum_full["Status"] == "WYGRANA"]
+przegrane = df_archiwum_full[df_archiwum_full["Status"] == "PRZEGRANA"]
+rozliczone = df_archiwum_full[df_archiwum_full["Status"].isin(["WYGRANA", "PRZEGRANA"])]
 
 zysk = (wygrane["Stawka"] * wygrane["Kurs"]).sum() - wygrane["Stawka"].sum() - przegrane["Stawka"].sum()
 suma_stawek = rozliczone["Stawka"].sum()
 yield_pct = (zysk / suma_stawek * 100) if suma_stawek > 0 else 0
 sredni_kurs = rozliczone["Kurs"].mean() if len(rozliczone) > 0 else 0
 
-rozliczone_sorted = rozliczone.copy()
-rozliczone_sorted["Data_sort"] = pd.to_datetime(rozliczone_sorted["Data"], format="%d.%m.%Y", errors="coerce")
-rozliczone_sorted = rozliczone_sorted.sort_values("Data_sort")
+rozliczone_sorted = rozliczone.sort_values("Data_dt")
 statusy_seria = rozliczone_sorted["Status"].tolist()
 
 streak_count = 0
@@ -92,7 +167,7 @@ else:
     streak_label = "brak serii"
 
 col1, col2, col3, col4, col5, col6 = st.columns(6)
-col1.metric("Liczba kuponów", len(df))
+col1.metric("Liczba kuponów", len(df_archiwum_full))
 win_rate = len(wygrane) / (len(wygrane) + len(przegrane)) * 100 if (len(wygrane) + len(przegrane)) > 0 else 0
 col2.metric("Win rate", f"{win_rate:.0f}%")
 col3.metric("Suma stawek", f"£{suma_stawek:.2f}")
@@ -114,11 +189,7 @@ def koloruj_status(val):
         return "background-color: #3a3a3a; color: white;"
 
 st.subheader("📚 Zapisane typy i analizy")
-
-if os.path.exists("analizy.csv"):
-    df_analizy = pd.read_csv("analizy.csv")
-else:
-    df_analizy = pd.DataFrame(columns=["data", "sport", "mecz", "rynek", "pewnosc", "stawka", "kurs", "wynik", "analiza"])
+st.caption("Widoczne: 6 najnowszych typów + wszystkie ze statusem OPEN. Starsze rozliczone trafiają do archiwum.")
 
 if len(df_analizy) > 0:
     st.dataframe(
@@ -137,24 +208,17 @@ opcje_sportow = [
 ]
 
 opcje_rynkow = [
-    "1X2 - Gospodarze",
-    "1X2 - Remis",
-    "1X2 - Gość",
-    "Over 0.5", "Under 0.5",
-    "Over 1.5", "Under 1.5",
-    "Over 2.5", "Under 2.5",
-    "Over 3.5", "Under 3.5",
-    "Over 4.5", "Under 4.5",
-    "BTTS Yes", "BTTS No",
+    "1X2 - Gospodarze", "1X2 - Remis", "1X2 - Gość",
+    "Over 0.5", "Under 0.5", "Over 1.5", "Under 1.5",
+    "Over 2.5", "Under 2.5", "Over 3.5", "Under 3.5",
+    "Over 4.5", "Under 4.5", "BTTS Yes", "BTTS No",
     "Handicap -1", "Handicap -1.5", "Handicap -2",
     "Handicap +1", "Handicap +1.5", "Handicap +2",
     "Double Chance 1X", "Double Chance X2", "Double Chance 12",
     "Win to Nil - Gospodarze", "Win to Nil - Gość",
-    "Correct Score",
-    "Zwycięzca meczu (ML)",
+    "Correct Score", "Zwycięzca meczu (ML)",
     "Over/Under sety", "Over/Under gemy",
-    "Over/Under punkty", "Over/Under goli w hokeju",
-    "Inne"
+    "Over/Under punkty", "Over/Under goli w hokeju", "Inne"
 ]
 
 with st.container():
@@ -181,7 +245,7 @@ with st.container():
         if not mecz_input or not analiza_input:
             st.error("Uzupełnij co najmniej nazwę meczu i analizę.")
         else:
-            nowy_wiersz = {
+            nowy_wiersz = pd.DataFrame([{
                 "data": data_input.strftime("%Y-%m-%d"),
                 "sport": sport_input,
                 "mecz": mecz_input,
@@ -190,43 +254,18 @@ with st.container():
                 "stawka": f"{stawka_input:.2f}",
                 "kurs": f"{kurs_input_analiza:.2f}",
                 "wynik": "OPEN",
-                "analiza": analiza_input.replace("\n", " ").strip()
-            }
+                "analiza": analiza_input.replace("\\n", " ").strip()
+            }])
 
-            token = st.secrets["GITHUB_TOKEN"]
-            repo = "Maruha3000/kupony-dashboard"
-            path = "analizy.csv"
-            url = f"https://api.github.com/repos/{repo}/contents/{path}"
-            headers = {"Authorization": f"token {token}"}
-
-            r = requests.get(url, headers=headers)
-
-            if r.status_code == 200:
-                file_data = r.json()
-                sha = file_data["sha"]
-                content = base64.b64decode(file_data["content"]).decode("utf-8")
+            content_now, sha_now = github_get("analizy.csv")
+            if content_now:
+                df_now = pd.read_csv(StringIO(content_now))
             else:
-                sha = None
-                content = "data,sport,mecz,rynek,pewnosc,stawka,kurs,wynik,analiza\n"
+                df_now = pd.DataFrame(columns=["data","sport","mecz","rynek","pewnosc","stawka","kurs","wynik","analiza"])
 
-            nowa_linia = ",".join([
-                nowy_wiersz["data"], nowy_wiersz["sport"],
-                f'"{nowy_wiersz["mecz"]}"', f'"{nowy_wiersz["rynek"]}"',
-                nowy_wiersz["pewnosc"], nowy_wiersz["stawka"],
-                nowy_wiersz["kurs"], nowy_wiersz["wynik"],
-                f'"{nowy_wiersz["analiza"]}"'
-            ])
-
-            nowa_zawartosc = content.rstrip("\n") + "\n" + nowa_linia + "\n"
-            encoded_content = base64.b64encode(nowa_zawartosc.encode("utf-8")).decode("utf-8")
-
-            payload = {
-                "message": f"Dodano typ: {mecz_input}",
-                "content": encoded_content,
-                "sha": sha
-            }
-
-            r2 = requests.put(url, headers=headers, json=payload)
+            df_now = pd.concat([df_now, nowy_wiersz], ignore_index=True)
+            buf = StringIO(); df_now.to_csv(buf, index=False)
+            r2 = github_put("analizy.csv", buf.getvalue(), sha_now, f"Dodano typ: {mecz_input}")
 
             if r2.status_code in [200, 201]:
                 st.success("Typ i analiza zostały zapisane na GitHub (status: OPEN).")
@@ -262,22 +301,33 @@ if st.button("Policz stawkę"):
     )
 
 st.divider()
-st.subheader("Filtry")
-c1, c2 = st.columns(2)
-sport_filter = c1.multiselect("Sport", options=df["Sport"].unique(), default=df["Sport"].unique())
-status_filter = c2.multiselect("Status", options=df["Status"].unique(), default=df["Status"].unique())
+st.subheader("Archiwum kuponów")
 
-df_filtered = df[df["Sport"].isin(sport_filter) & df["Status"].isin(status_filter)]
-
-st.subheader("Wszystkie kupony - czerwiec 2026")
-st.dataframe(
-    df_filtered.style.map(koloruj_status, subset=["Status"]),
-    use_container_width=True
+df_archiwum_full["MiesiacRok"] = df_archiwum_full["Data_dt"].apply(
+    lambda d: f"{MIESIACE_PL[d.month]} {d.year}" if pd.notna(d) else "Nieznana data"
 )
+dostepne_miesiace = df_archiwum_full.sort_values("Data_dt", ascending=False)["MiesiacRok"].unique().tolist()
+
+if len(dostepne_miesiace) > 0:
+    wybrany_miesiac = st.selectbox("Wybierz miesiąc", dostepne_miesiace)
+    df_miesiac = df_archiwum_full[df_archiwum_full["MiesiacRok"] == wybrany_miesiac].drop(columns=["Data_dt", "MiesiacRok"])
+
+    c1, c2 = st.columns(2)
+    sport_filter = c1.multiselect("Sport", options=df_miesiac["Sport"].unique(), default=df_miesiac["Sport"].unique())
+    status_filter = c2.multiselect("Status", options=df_miesiac["Status"].unique(), default=df_miesiac["Status"].unique())
+
+    df_filtered = df_miesiac[df_miesiac["Sport"].isin(sport_filter) & df_miesiac["Status"].isin(status_filter)]
+
+    st.dataframe(
+        df_filtered.style.map(koloruj_status, subset=["Status"]),
+        use_container_width=True
+    )
+else:
+    st.info("Brak danych archiwalnych.")
 
 st.divider()
 st.subheader("🔒 Zmień status kuponu")
-st.caption("Zmiana statusu wymaga podania kodu PIN.")
+st.caption("Zmiana statusu wymaga podania kodu PIN. Dotyczy typów widocznych w sekcji 'Zapisane typy i analizy'.")
 
 if len(df_analizy) > 0:
     opcje_meczow = df_analizy.apply(
@@ -293,30 +343,14 @@ if len(df_analizy) > 0:
         if pin_input != st.secrets["APP_PIN"]:
             st.error("Nieprawidłowy kod PIN. Zmiana nie została zapisana.")
         else:
+            content_now, sha_now = github_get("analizy.csv")
+            df_now = pd.read_csv(StringIO(content_now)) if content_now else df_analizy.copy()
+
             idx = opcje_meczow.index(wybrany_mecz)
-            df_analizy.loc[df_analizy.index[idx], "wynik"] = nowy_status
+            df_now.loc[idx, "wynik"] = nowy_status
 
-            token = st.secrets["GITHUB_TOKEN"]
-            repo = "Maruha3000/kupony-dashboard"
-            path = "analizy.csv"
-            url = f"https://api.github.com/repos/{repo}/contents/{path}"
-            headers = {"Authorization": f"token {token}"}
-
-            r = requests.get(url, headers=headers)
-            sha = r.json()["sha"] if r.status_code == 200 else None
-
-            csv_buffer = StringIO()
-            df_analizy.to_csv(csv_buffer, index=False)
-            nowa_zawartosc = csv_buffer.getvalue()
-            encoded_content = base64.b64encode(nowa_zawartosc.encode("utf-8")).decode("utf-8")
-
-            payload = {
-                "message": f"Zmieniono status: {wybrany_mecz} -> {nowy_status}",
-                "content": encoded_content,
-                "sha": sha
-            }
-
-            r2 = requests.put(url, headers=headers, json=payload)
+            buf = StringIO(); df_now.to_csv(buf, index=False)
+            r2 = github_put("analizy.csv", buf.getvalue(), sha_now, f"Zmieniono status: {wybrany_mecz} -> {nowy_status}")
 
             if r2.status_code in [200, 201]:
                 st.success(f"Status zaktualizowany na: {nowy_status}. Odśwież stronę, aby zobaczyć zmianę w tabeli.")
