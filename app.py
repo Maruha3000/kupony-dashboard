@@ -184,9 +184,60 @@ st.subheader("📚 Zapisane typy i analizy")
 
 if os.path.exists("analizy.csv"):
     df_analizy = pd.read_csv("analizy.csv")
-    if len(df_analizy) > 0:
-        st.dataframe(df_analizy.sort_values("data", ascending=False), use_container_width=True)
-    else:
-        st.info("Brak zapisanych analiz.")
+else:
+    df_analizy = pd.DataFrame(columns=["data", "sport", "mecz", "rynek", "pewnosc", "stawka", "kurs", "wynik", "analiza"])
+
+if len(df_analizy) > 0:
+    st.dataframe(df_analizy.sort_values("data", ascending=False), use_container_width=True)
 else:
     st.info("Brak zapisanych analiz — dodaj pierwszy typ powyżej.")
+
+st.divider()
+st.subheader("🔒 Zmień status kuponu")
+st.caption("Zmiana statusu wymaga podania kodu PIN.")
+
+if len(df_analizy) > 0:
+    opcje_meczow = df_analizy.apply(
+        lambda row: f"{row['data']} | {row['mecz']} | {row['rynek']} (aktualny status: {row['wynik']})",
+        axis=1
+    ).tolist()
+
+    wybrany_mecz = st.selectbox("Wybierz kupon do zmiany", opcje_meczow)
+    nowy_status = st.selectbox("Nowy status", ["OPEN", "WYGRANA", "PRZEGRANA"])
+    pin_input = st.text_input("Kod PIN", type="password", max_chars=4)
+
+    if st.button("Zapisz zmianę"):
+        if pin_input != st.secrets["APP_PIN"]:
+            st.error("Nieprawidłowy kod PIN. Zmiana nie została zapisana.")
+        else:
+            idx = opcje_meczow.index(wybrany_mecz)
+            df_analizy.loc[df_analizy.index[idx], "wynik"] = nowy_status
+
+            token = st.secrets["GITHUB_TOKEN"]
+            repo = "Maruha3000/kupony-dashboard"
+            path = "analizy.csv"
+            url = f"https://api.github.com/repos/{repo}/contents/{path}"
+            headers = {"Authorization": f"token {token}"}
+
+            r = requests.get(url, headers=headers)
+            sha = r.json()["sha"] if r.status_code == 200 else None
+
+            csv_buffer = StringIO()
+            df_analizy.to_csv(csv_buffer, index=False)
+            nowa_zawartosc = csv_buffer.getvalue()
+            encoded_content = base64.b64encode(nowa_zawartosc.encode("utf-8")).decode("utf-8")
+
+            payload = {
+                "message": f"Zmieniono status: {wybrany_mecz} -> {nowy_status}",
+                "content": encoded_content,
+                "sha": sha
+            }
+
+            r2 = requests.put(url, headers=headers, json=payload)
+
+            if r2.status_code in [200, 201]:
+                st.success(f"Status zaktualizowany na: {nowy_status}. Odśwież stronę, aby zobaczyć zmianę w tabeli.")
+            else:
+                st.error(f"Błąd zapisu do GitHub: {r2.status_code} — {r2.text}")
+else:
+    st.info("Brak kuponów do edycji.")
