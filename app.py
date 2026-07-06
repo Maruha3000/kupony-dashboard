@@ -164,6 +164,12 @@ def koloruj_status(val):
     else:
         return "background-color: #3a3a3a; color: white;"
 
+STATUS_KOLOR = {
+    "WYGRANA": "#1e5e2e",
+    "PRZEGRANA": "#6e1e1e",
+    "OPEN": "#4a4a1e",
+}
+
 st.subheader("📊 Statystyki")
 zakres_wyboru = st.selectbox("Przedział czasowy", ["Ostatnie 7 dni", "Ostatni miesiąc", "Cały okres"], index=2)
 
@@ -200,14 +206,32 @@ col5.metric("Yield (ROI)", f"{yield_pct:+.1f}%")
 st.caption(f"Średni kurs zagranych kuponów: {sredni_kurs:.2f}")
 st.divider()
 
-st.subheader("📚 Zapisane typy i analizy")
+st.subheader("Najnowsze typy")
 st.caption("Widoczne: 6 najnowszych typów + wszystkie ze statusem OPEN. Starsze rozliczone trafiają do archiwum.")
 
 if len(df_analizy) > 0:
-    st.dataframe(
-        df_analizy.sort_values("data", ascending=False).style.map(koloruj_status, subset=["wynik"]),
-        use_container_width=True
-    )
+    for _, row in df_analizy.sort_values("data", ascending=False).iterrows():
+        kolor = STATUS_KOLOR.get(row["wynik"], "#3a3a3a")
+        with st.container(border=True):
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                st.markdown(f"**{row['mecz']}**")
+                st.caption(f"{row['data']} — {row['sport']}")
+            with c2:
+                st.markdown(
+                    f"<div style='background-color:{kolor};color:white;padding:4px 10px;"
+                    f"border-radius:6px;text-align:center;font-weight:600;'>{row['wynik']}</div>",
+                    unsafe_allow_html=True
+                )
+
+            st.markdown(
+                f"**Rynek:** {row['rynek']}  \n"
+                f"**Pewność:** {row['pewnosc']}  \n"
+                f"**Stawka:** £{row['stawka']}  |  **Kurs:** {row['kurs']}"
+            )
+
+            if str(row.get("analiza", "")).strip():
+                st.markdown(f"_{row['analiza']}_")
 else:
     st.info("Brak zapisanych analiz — dodaj pierwszy typ poniżej.")
 
@@ -339,7 +363,7 @@ else:
 
 st.divider()
 st.subheader("🔒 Zmień status kuponu")
-st.caption("Zmiana statusu wymaga podania kodu PIN. Dotyczy typów widocznych w sekcji 'Zapisane typy i analizy'.")
+st.caption("Zmiana statusu wymaga podania kodu PIN. Dotyczy typów widocznych w sekcji 'Najnowsze typy'.")
 
 if len(df_analizy) > 0:
     opcje_meczow = df_analizy.apply(
