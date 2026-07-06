@@ -7,7 +7,7 @@ from datetime import datetime
 import requests
 import base64
 st.set_page_config(page_title="Kupony Dashboard", layout="wide")
-st.title("📊 Dashboard Kuponów - William Hill")
+st.title("📊 Garnek z kapustą")
 
 data = """Data,Sport,Rozgrywki,Mecz,Rynek,Pewnosc,Stawka,Kurs,Godzina,Status
 03.06.2026,Pilka,Friendly,Poland vs Nigeria,Over 2.5 goli,Ryzykowny,0.50,2.00,19:45,WYGRANA
