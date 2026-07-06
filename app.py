@@ -80,6 +80,11 @@ else:
 st.divider()
 st.subheader("✏️ Dodaj nowy typ i analizę")
 
+opcje_sportow = [
+    "Pilka", "Tenis", "Hokej", "Koszykowka", "Siatkowka",
+    "Baseball", "Rugby", "Snooker", "Darts", "MMA/Boks", "Inne"
+]
+
 opcje_rynkow = [
     "1X2 - Gospodarze",
     "1X2 - Remis",
@@ -104,7 +109,7 @@ opcje_rynkow = [
 with st.container():
     col_a, col_b = st.columns(2)
     data_input = col_a.date_input("Data meczu", value=datetime.today())
-    sport_input = col_b.text_input("Sport", value="Pilka")
+    sport_input = col_b.selectbox("Sport", opcje_sportow)
 
     col_c, col_d = st.columns(2)
     mecz_input = col_c.text_input("Mecz", placeholder="np. Barcelona vs Inter")
@@ -114,9 +119,7 @@ with st.container():
     pewnosc_input_analiza = col_e.selectbox("Poziom pewności", ["Pewny", "Sredni", "Ryzykowny"])
     stawka_input = col_f.number_input("Stawka (GBP)", min_value=0.0, step=0.5)
 
-    col_g, col_h = st.columns(2)
-    kurs_input_analiza = col_g.number_input("Kurs WH", min_value=1.0, step=0.01)
-    wynik_input = col_h.selectbox("Status kuponu", ["OPEN", "WYGRANA", "PRZEGRANA"])
+    kurs_input_analiza = st.number_input("Kurs WH", min_value=1.0, step=0.01)
 
     analiza_input = st.text_area(
         "Twoja analiza (opis po ludzku)",
@@ -135,7 +138,7 @@ with st.container():
                 "pewnosc": pewnosc_input_analiza,
                 "stawka": f"{stawka_input:.2f}",
                 "kurs": f"{kurs_input_analiza:.2f}",
-                "wynik": wynik_input,
+                "wynik": "OPEN",
                 "analiza": analiza_input.replace("\n", " ").strip()
             }
 
@@ -175,7 +178,7 @@ with st.container():
             r2 = requests.put(url, headers=headers, json=payload)
 
             if r2.status_code in [200, 201]:
-                st.success("Typ i analiza zostały zapisane na GitHub.")
+                st.success("Typ i analiza zostały zapisane na GitHub (status: OPEN).")
             else:
                 st.error(f"Błąd zapisu do GitHub: {r2.status_code} — {r2.text}")
 
