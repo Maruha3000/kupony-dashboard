@@ -4,6 +4,8 @@ from io import StringIO
 import csv
 import os
 from datetime import datetime
+import requests
+import base64
 st.set_page_config(page_title="Kupony Dashboard", layout="wide")
 st.title("📊 Dashboard Kuponów - William Hill")
 
@@ -175,35 +177,62 @@ analiza_input = st.text_area(
     "Twoja analiza (opis po ludzku)",
     placeholder="Tutaj wklej swoją analizę meczu w zwykłym języku..."
 )
-
 if st.button("Zapisz typ i analizę"):
     if not mecz_input or not analiza_input:
         st.error("Uzupełnij co najmniej nazwę meczu i analizę.")
     else:
-        row = [
-            data_input.strftime("%Y-%m-%d"),
-            sport_input,
-            mecz_input,
-            rynek_input_analiza,
-            pewnosc_input_analiza,
-            f"{stawka_input:.2f}",
-            f"{kurs_input_analiza:.2f}",
-            wynik_input,
-            analiza_input.replace("\n", " ").strip()
-        ]
+        nowy_wiersz = {
+            "data": data_input.strftime("%Y-%m-%d"),
+            "sport": sport_input,
+            "mecz": mecz_input,
+            "rynek": rynek_input_analiza,
+            "pewnosc": pewnosc_input_analiza,
+            "stawka": f"{stawka_input:.2f}",
+            "kurs": f"{kurs_input_analiza:.2f}",
+            "wynik": wynik_input,
+            "analiza": analiza_input.replace("\n", " ").strip()
+        }
 
-        file_path = "analizy.csv"
+        token = st.secrets["GITHUB_TOKEN"]
+        repo = "Maruha3000/kupony-dashboard"
+        path = "analizy.csv"
+        url = f"https://api.github.com/repos/{repo}/contents/{path}"
+        headers = {"Authorization": f"token {token}"}
 
-        file_exists = os.path.exists(file_path)
-        with open(file_path, "a", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            if not file_exists:
-                writer.writerow(
-                    ["data", "sport", "mecz", "rynek", "pewnosc", "stawka", "kurs", "wynik", "analiza"]
-                )
-            writer.writerow(row)
+        r = requests.get(url, headers=headers)
 
-        st.success("Typ i analiza zostały zapisane do archiwum.")
+        if r.status_code == 200:
+            file_data = r.json()
+            sha = file_data["sha"]
+            content = base64.b64decode(file_data["content"]).decode("utf-8")
+        else:
+            sha = None
+            content = "data,sport,mecz,rynek,pewnosc,stawka,kurs,wynik,analiza\n"
+
+        nowa_linia = ",".join([
+            nowy_wiersz["data"], nowy_wiersz["sport"],
+            f'"{nowy_wiersz["mecz"]}"', f'"{nowy_wiersz["rynek"]}"',
+            nowy_wiersz["pewnosc"], nowy_wiersz["stawka"],
+            nowy_wiersz["kurs"], nowy_wiersz["wynik"],
+            f'"{nowy_wiersz["analiza"]}"'
+        ])
+
+        nowa_zawartosc = content.rstrip("\n") + "\n" + nowa_linia + "\n"
+        encoded_content = base64.b64encode(nowa_zawartosc.encode("utf-8")).decode("utf-8")
+
+        payload = {
+            "message": f"Dodano typ: {mecz_input}",
+            "content": encoded_content,
+            "sha": sha
+        }
+
+        r2 = requests.put(url, headers=headers, json=payload)
+
+        if r2.status_code in [200, 201]:
+            st.success("Typ i analiza zostały zapisane na GitHub.")
+        else:
+            st.error(f"Błąd zapisu do GitHub: {r2.status_code} — {r2.text}")
+
         st.divider()
 st.subheader("📚 Zapisane typy i analizy")
 
