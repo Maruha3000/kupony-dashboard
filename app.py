@@ -204,3 +204,14 @@ if st.button("Zapisz typ i analizę"):
             writer.writerow(row)
 
         st.success("Typ i analiza zostały zapisane do archiwum.")
+        st.divider()
+st.subheader("📚 Zapisane typy i analizy")
+
+if os.path.exists("analizy.csv"):
+    df_analizy = pd.read_csv("analizy.csv")
+    if len(df_analizy) > 0:
+        st.dataframe(df_analizy.sort_values("data", ascending=False), use_container_width=True)
+    else:
+        st.info("Brak zapisanych analiz.")
+else:
+    st.info("Brak zapisanych analiz — dodaj pierwszy typ powyżej.")
