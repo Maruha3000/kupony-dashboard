@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
 from io import StringIO
-
+import csv
+import os
+from datetime import datetime
 st.set_page_config(page_title="Kupony Dashboard", layout="wide")
 st.title("📊 Dashboard Kuponów - William Hill")
 
@@ -151,9 +153,6 @@ if st.button("Policz stawkę"):
         "Pewny 1.50 GBP, Średni 1.00 GBP, Ryzykowny 0.50 GBP — czyli od 1.8% do 5.4% banku, "
         "zależnie od poziomu pewności."
     )
-    import csv
-from datetime import datetime
-import os
 
 st.divider()
 st.subheader("✏️ Dodaj nowy typ i analizę")
