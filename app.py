@@ -3,11 +3,25 @@ import pandas as pd
 from io import StringIO
 import csv
 import os
+import random
 from datetime import datetime
 import requests
 import base64
 st.set_page_config(page_title="Kupony Dashboard", layout="wide")
 st.title("📊 Garnek z kapustą")
+
+cytaty_dnia = [
+    "Dyscyplina bije emocje. Zawsze.",
+    "Bank nie rośnie od jednego kuponu — rośnie od systemu.",
+    "Najlepszy zakład to czasem ten, którego nie postawisz.",
+    "Cierpliwość to najbardziej niedoceniana strategia bukmacherska.",
+    "Nie gonimy strat. Trzymamy się planu.",
+    "Value > emocje. Zawsze.",
+    "Mały, stabilny zysk pokona dużą, ryzykowną stratę.",
+    "Systematyczność wygrywa z natchnieniem.",
+]
+random.seed(datetime.today().strftime("%Y-%m-%d"))
+st.info(f"💡 {random.choice(cytaty_dnia)}")
 
 data = """Data,Sport,Rozgrywki,Mecz,Rynek,Pewnosc,Stawka,Kurs,Godzina,Status
 03.06.2026,Pilka,Friendly,Poland vs Nigeria,Over 2.5 goli,Ryzykowny,0.50,2.00,19:45,WYGRANA
@@ -54,16 +68,50 @@ suma_stawek = rozliczone["Stawka"].sum()
 yield_pct = (zysk / suma_stawek * 100) if suma_stawek > 0 else 0
 sredni_kurs = rozliczone["Kurs"].mean() if len(rozliczone) > 0 else 0
 
-col1, col2, col3, col4, col5 = st.columns(5)
+rozliczone_sorted = rozliczone.copy()
+rozliczone_sorted["Data_sort"] = pd.to_datetime(rozliczone_sorted["Data"], format="%d.%m.%Y", errors="coerce")
+rozliczone_sorted = rozliczone_sorted.sort_values("Data_sort")
+statusy_seria = rozliczone_sorted["Status"].tolist()
+
+streak_count = 0
+streak_type = None
+for s in reversed(statusy_seria):
+    if streak_type is None:
+        streak_type = s
+        streak_count = 1
+    elif s == streak_type:
+        streak_count += 1
+    else:
+        break
+
+if streak_type == "WYGRANA":
+    streak_label = f"🔥 {streak_count} wygrane z rzędu"
+elif streak_type == "PRZEGRANA":
+    streak_label = f"❄️ {streak_count} przegrane z rzędu"
+else:
+    streak_label = "brak serii"
+
+col1, col2, col3, col4, col5, col6 = st.columns(6)
 col1.metric("Liczba kuponów", len(df))
 win_rate = len(wygrane) / (len(wygrane) + len(przegrane)) * 100 if (len(wygrane) + len(przegrane)) > 0 else 0
 col2.metric("Win rate", f"{win_rate:.0f}%")
 col3.metric("Suma stawek", f"£{suma_stawek:.2f}")
 col4.metric("Zysk / strata netto", f"£{zysk:+.2f}")
 col5.metric("Yield (ROI)", f"{yield_pct:+.1f}%")
+col6.metric("Aktualna seria", streak_label)
 
 st.caption(f"Średni kurs zagranych kuponów: {sredni_kurs:.2f}")
 st.divider()
+
+def koloruj_status(val):
+    if val == "WYGRANA":
+        return "background-color: #1e5e2e; color: white;"
+    elif val == "PRZEGRANA":
+        return "background-color: #6e1e1e; color: white;"
+    elif val == "OPEN":
+        return "background-color: #4a4a1e; color: white;"
+    else:
+        return "background-color: #3a3a3a; color: white;"
 
 st.subheader("📚 Zapisane typy i analizy")
 
@@ -73,7 +121,10 @@ else:
     df_analizy = pd.DataFrame(columns=["data", "sport", "mecz", "rynek", "pewnosc", "stawka", "kurs", "wynik", "analiza"])
 
 if len(df_analizy) > 0:
-    st.dataframe(df_analizy.sort_values("data", ascending=False), use_container_width=True)
+    st.dataframe(
+        df_analizy.sort_values("data", ascending=False).style.applymap(koloruj_status, subset=["wynik"]),
+        use_container_width=True
+    )
 else:
     st.info("Brak zapisanych analiz — dodaj pierwszy typ poniżej.")
 
@@ -219,7 +270,10 @@ status_filter = c2.multiselect("Status", options=df["Status"].unique(), default=
 df_filtered = df[df["Sport"].isin(sport_filter) & df["Status"].isin(status_filter)]
 
 st.subheader("Wszystkie kupony - czerwiec 2026")
-st.dataframe(df_filtered, use_container_width=True)
+st.dataframe(
+    df_filtered.style.applymap(koloruj_status, subset=["Status"]),
+    use_container_width=True
+)
 
 st.divider()
 st.subheader("🔒 Zmień status kuponu")
@@ -266,6 +320,8 @@ if len(df_analizy) > 0:
 
             if r2.status_code in [200, 201]:
                 st.success(f"Status zaktualizowany na: {nowy_status}. Odśwież stronę, aby zobaczyć zmianę w tabeli.")
+                if nowy_status == "WYGRANA":
+                    st.balloons()
             else:
                 st.error(f"Błąd zapisu do GitHub: {r2.status_code} — {r2.text}")
 else:
