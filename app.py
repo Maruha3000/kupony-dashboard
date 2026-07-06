@@ -122,7 +122,7 @@ else:
 
 if len(df_analizy) > 0:
     st.dataframe(
-        df_analizy.sort_values("data", ascending=False).style.applymap(koloruj_status, subset=["wynik"]),
+        df_analizy.sort_values("data", ascending=False).style.map(koloruj_status, subset=["wynik"]),
         use_container_width=True
     )
 else:
@@ -271,7 +271,7 @@ df_filtered = df[df["Sport"].isin(sport_filter) & df["Status"].isin(status_filte
 
 st.subheader("Wszystkie kupony - czerwiec 2026")
 st.dataframe(
-    df_filtered.style.applymap(koloruj_status, subset=["Status"]),
+    df_filtered.style.map(koloruj_status, subset=["Status"]),
     use_container_width=True
 )
 
