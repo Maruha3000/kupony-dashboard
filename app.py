@@ -336,8 +336,7 @@ if len(dostepne_miesiace) > 0:
     )
 else:
     st.info("Brak danych archiwalnych.")
-
-st.divider()
+  st.divider()
 st.subheader("🔒 Zmień status kuponu")
 st.caption("Zmiana statusu wymaga podania kodu PIN. Dotyczy typów widocznych w sekcji 'Zapisane typy i analizy'.")
 
@@ -355,20 +354,34 @@ if len(df_analizy) > 0:
         if pin_input != st.secrets["APP_PIN"]:
             st.error("Nieprawidłowy kod PIN. Zmiana nie została zapisana.")
         else:
+            wybrany_idx = opcje_meczow.index(wybrany_mecz)
+            wybrany_row = df_analizy.iloc[wybrany_idx]
+
             content_now, sha_now = github_get("analizy.csv")
             df_now = pd.read_csv(StringIO(content_now)) if content_now else df_analizy.copy()
 
-            idx = opcje_meczow.index(wybrany_mecz)
-            df_now.loc[idx, "wynik"] = nowy_status
+            mask = (
+                (df_now["data"] == wybrany_row["data"]) &
+                (df_now["mecz"] == wybrany_row["mecz"]) &
+                (df_now["rynek"] == wybrany_row["rynek"]) &
+                (df_now["stawka"].astype(str) == str(wybrany_row["stawka"])) &
+                (df_now["kurs"].astype(str) == str(wybrany_row["kurs"]))
+            )
 
-            buf = StringIO(); df_now.to_csv(buf, index=False)
-            r2 = github_put("analizy.csv", buf.getvalue(), sha_now, f"Zmieniono status: {wybrany_mecz} -> {nowy_status}")
-
-            if r2.status_code in [200, 201]:
-                st.success(f"Status zaktualizowany na: {nowy_status}. Odśwież stronę, aby zobaczyć zmianę w tabeli.")
-                if nowy_status == "WYGRANA":
-                    st.balloons()
+            if mask.sum() == 0:
+                st.error("Nie znaleziono tego kuponu w pliku na GitHubie. Odśwież stronę i spróbuj ponownie.")
             else:
-                st.error(f"Błąd zapisu do GitHub: {r2.status_code} — {r2.text}")
+                df_now.loc[mask, "wynik"] = nowy_status
+                buf = StringIO(); df_now.to_csv(buf, index=False)
+                r2 = github_put("analizy.csv", buf.getvalue(), sha_now, f"Zmieniono status: {wybrany_mecz} -> {nowy_status}")
+
+                if r2.status_code in [200, 201]:
+                    st.success(f"Status zaktualizowany na: {nowy_status}. Odśwież stronę, aby zobaczyć zmianę w tabeli.")
+                    if nowy_status == "WYGRANA":
+                        st.balloons()
+                else:
+                    st.error(f"Błąd zapisu do GitHub: {r2.status_code} — {r2.text}")
 else:
     st.info("Brak kuponów do edycji.")
+
+
