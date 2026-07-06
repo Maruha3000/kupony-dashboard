@@ -96,8 +96,6 @@ lipiec_data = """Data,Sport,Rozgrywki,Mecz,Rynek,Pewnosc,Stawka,Kurs,Godzina,Sta
 05.07.2026,Pilka,MS 2026 R16,Paraguay vs France,France -1.5,Sredni,1.00,1.62,22:00,PRZEGRANA
 05.07.2026,Pilka,Friendly/MS,Brazil vs Norway,Over 2.5 gole,Sredni,1.00,1.73,20:00,WYGRANA
 05.07.2026,Pilka,Friendly/MS,Mexico vs England,Under 1.5 gole,Ryzykowny,0.50,2.85,01:00 (06.07),PRZEGRANA
-06.07.2026,Pilka,MS 2026,Portugal vs Spain,Spain Win (90 min),Pewny,1.50,1.87,20:00,OPEN
-06.07.2026,Pilka,MS 2026,USA vs Belgium,Over 2.5 gole,Sredni,1.00,1.95,01:00 (07.07),OPEN
 """
 
 df_czerwiec = pd.read_csv(StringIO(czerwiec_data))
