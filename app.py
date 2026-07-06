@@ -63,3 +63,41 @@ df_filtered = df[df["Sport"].isin(sport_filter) & df["Status"].isin(status_filte
 
 st.subheader("Wszystkie kupony - czerwiec 2026")
 st.dataframe(df_filtered, use_container_width=True)
+st.divider()
+st.header("🔍 Kalkulator zgodności z zasadami (sekcja B)")
+st.caption("Wpisz parametry meczu, a system sprawdzi zgodność z Twoimi zasadami B19, B21, B31.")
+
+c1, c2, c3 = st.columns(3)
+sport_input = c1.selectbox("Sport", ["Pilka", "Tenis", "Hokej", "Koszykowka", "Inne"])
+kurs_input = c2.number_input("Kurs WH", min_value=1.01, max_value=20.0, value=1.80, step=0.01)
+rozgrywki_input = c3.selectbox("Typ rozgrywek", ["Faza grupowa", "Faza pucharowa / KO", "Friendly (towarzyski)", "Liga krajowa", "Inne"])
+
+rynek_input = st.selectbox("Rynek", ["Over/Under", "BTTS", "1X2 / ML", "Handicap", "Inne"])
+
+if st.button("Sprawdź zgodność"):
+    powody_skip = []
+    ostrzezenia = []
+
+    if kurs_input < 1.20:
+        powody_skip.append("B19: kurs poniżej minimalnego progu 1.20 — automatyczny SKIP")
+
+    if rozgrywki_input == "Friendly (towarzyski)" and kurs_input < 1.60:
+        powody_skip.append("B21: mecz towarzyski (friendly) z niskim kursem — ryzyko braku motywacji zespołów")
+
+    if rozgrywki_input == "Faza pucharowa / KO" and rynek_input in ["Over/Under", "BTTS"] and kurs_input < 1.85:
+        powody_skip.append("B31: rynek Over/BTTS w fazie pucharowej wymaga kursu min. 1.85")
+
+    if kurs_input < 1.50:
+        ostrzezenia.append("Niski kurs — sprawdź, czy value jest wystarczające (K3)")
+
+    if powody_skip:
+        st.error("❌ SKIP — mecz nie przechodzi kontroli zasad:")
+        for p in powody_skip:
+            st.write(f"- {p}")
+    else:
+        st.success("✅ Mecz przechodzi wstępną kontrolę zasad B")
+        if ostrzezenia:
+            st.warning("⚠️ Uwagi:")
+            for o in ostrzezenia:
+                st.write(f"- {o}")
+        st.info("Pamiętaj: to tylko filtr reguł kursowych. Pełna decyzja wymaga jeszcze procedury K1-K7 (statystyki, źródła, składy).")
