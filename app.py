@@ -8,8 +8,14 @@ import requests
 import base64
 
 st.set_page_config(page_title="Kupony Dashboard", layout="wide")
-st.title("Garnek z kapustą")
 
+st.title("⚖️ Sędzia AI")
+st.markdown(
+    "<p style='font-size:1.1rem; font-style:italic; margin-top:-10px;'>"
+    "\"Nie szukamy typów.<br>Eliminujemy złe decyzje.\"</p>",
+    unsafe_allow_html=True
+)
+st.caption("Sędzia AI – system wydawania werdyktów dla zakładów sportowych.")
 MIESIACE_PL = {1:"Styczeń",2:"Luty",3:"Marzec",4:"Kwiecień",5:"Maj",6:"Czerwiec",
                7:"Lipiec",8:"Sierpień",9:"Wrzesień",10:"Październik",11:"Listopad",12:"Grudzień"}
 
