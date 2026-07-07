@@ -65,18 +65,26 @@ def github_put(path, content_str, sha, message):
         payload["sha"] = sha
     return requests.put(url, headers=headers, json=payload)
 
-cytaty_dnia = [
-    "Dyscyplina bije emocje. Zawsze.",
-    "Bank nie rośnie od jednego kuponu — rośnie od systemu.",
-    "Najlepszy zakład to czasem ten, którego nie postawisz.",
-    "Cierpliwość to najbardziej niedoceniana strategia bukmacherska.",
-    "Nie gonimy strat. Trzymamy się planu.",
-    "Value > emocje. Zawsze.",
-    "Mały, stabilny zysk pokona dużą, ryzykowną stratę.",
-    "Systematyczność wygrywa z natchnieniem.",
-]
-random.seed(datetime.today().strftime("%Y-%m-%d"))
-st.info(f"💡 {random.choice(cytaty_dnia)}")
+st.markdown(
+    """
+    <style>
+    @keyframes pulseGlow {
+        0%   { box-shadow: 0 0 0px 0px rgba(74,144,226,0.6); }
+        50%  { box-shadow: 0 0 12px 4px rgba(74,144,226,0.55); }
+        100% { box-shadow: 0 0 0px 0px rgba(74,144,226,0.6); }
+    }
+    .kupon-open {
+        animation: pulseGlow 2.2s infinite;
+        border-radius: 10px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+status_dnia_placeholder = st.empty()
+licznik_placeholder = st.empty()
+ostatni_werdykt_placeholder = st.empty()
 
 czerwiec_data = """Data,Sport,Rozgrywki,Mecz,Rynek,Pewnosc,Stawka,Kurs,Godzina,Status
 03.06.2026,Pilka,Friendly,Poland vs Nigeria,Over 2.5 goli,Ryzykowny,0.50,2.00,19:45,WYGRANA
@@ -183,6 +191,46 @@ if len(df_analizy) > 0:
 df_archiwum_full = pd.concat([df_czerwiec, df_lipiec, df_archiwum], ignore_index=True, sort=False)
 df_archiwum_full["Data_dt"] = pd.to_datetime(df_archiwum_full["Data"], format="%d.%m.%Y", errors="coerce")
 
+# --- Dane pomocnicze do sekcji "żywych" ---
+rozliczone_all = df_archiwum_full[df_archiwum_full["Status"].isin(["WYGRANA", "PRZEGRANA"])].copy()
+
+# Nagłówek statusu dnia (ostatnie 24h)
+dzis_ts = pd.Timestamp(datetime.today().date())
+ostatnie_24h = rozliczone_all[rozliczone_all["Data_dt"] >= dzis_ts - timedelta(days=1)]
+w24 = (ostatnie_24h["Status"] == "WYGRANA").sum()
+p24 = (ostatnie_24h["Status"] == "PRZEGRANA").sum()
+
+if len(ostatnie_24h) == 0:
+    status_txt, status_kolor, status_emoji = "Sędzia czeka na rozstrzygnięcia", "#4a4a1e", "⏳"
+elif w24 > p24:
+    status_txt, status_kolor, status_emoji = "Sędzia w dobrej formie", "#1e5e2e", "🟢"
+elif w24 < p24:
+    status_txt, status_kolor, status_emoji = "Sędzia dziś czujny na błędy", "#6e1e1e", "🔴"
+else:
+    status_txt, status_kolor, status_emoji = "Sędzia na neutralnym kursie", "#4a4a1e", "🟡"
+
+status_dnia_placeholder.markdown(
+    f"""
+    <div style='background-color:{status_kolor}; padding:14px 18px; border-radius:10px;
+                text-align:center; margin-bottom:10px; color:white; font-weight:600; font-size:1.05rem;'>
+        {status_emoji} {status_txt} — ostatnie 24h: {w24} wygrane / {p24} przegrane
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# Licznik dni działania i liczba werdyktów
+if rozliczone_all["Data_dt"].notna().any():
+    pierwsza_data = rozliczone_all["Data_dt"].min()
+    dni_dzialania = max((dzis_ts - pierwsza_data).days, 0)
+else:
+    dni_dzialania = 0
+liczba_werdyktow = len(rozliczone_all)
+
+licznik_placeholder.caption(
+    f"⚖️ Sędzia AI działa od {dni_dzialania} dni i wydał {liczba_werdyktow} werdyktów."
+)
+
 def koloruj_status(val):
     if val == "WYGRANA":
         return "background-color: #1e5e2e; color: white;"
@@ -198,6 +246,35 @@ STATUS_KOLOR = {
     "PRZEGRANA": "#6e1e1e",
     "OPEN": "#4a4a1e",
 }
+
+# --- Sekcja: Ostatni werdykt (wyróżniona karta) ---
+if len(df_analizy) > 0:
+    ow = df_analizy.sort_values("data", ascending=False).iloc[0]
+    ow_kolor = STATUS_KOLOR.get(ow["wynik"], "#3a3a3a")
+    ow_pulse_class = "kupon-open" if ow["wynik"] == "OPEN" else ""
+    ostatni_werdykt_placeholder.markdown(
+        f"""
+        <div class="{ow_pulse_class}" style='background-color:#1c1f26; border:1px solid #333;
+                    border-left:6px solid {ow_kolor}; border-radius:12px; padding:18px 22px;
+                    margin-bottom:14px;'>
+            <div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;'>
+                <span style='font-size:0.85rem; color:#8a8a8a; text-transform:uppercase; letter-spacing:1px;'>
+                    ⚖️ Ostatni werdykt
+                </span>
+                <span style='background-color:{ow_kolor}; color:white; padding:4px 12px;
+                              border-radius:6px; font-weight:600; font-size:0.85rem;'>{ow["wynik"]}</span>
+            </div>
+            <p style='font-size:1.2rem; font-weight:700; margin:0 0 4px 0; color:#f0f0f0;'>{ow["mecz"]}</p>
+            <p style='font-size:0.9rem; color:#b0b0b0; margin:0 0 10px 0;'>{ow["data"]} — {ow["sport"]}</p>
+            <p style='font-size:0.95rem; margin:0; color:#e0e0e0;'>
+                <b>Rynek:</b> {ow["rynek"]} &nbsp;|&nbsp; <b>Pewność:</b> {ow["pewnosc"]} &nbsp;|&nbsp;
+                <b>Stawka:</b> £{ow["stawka"]} &nbsp;|&nbsp; <b>Kurs:</b> {ow["kurs"]}
+            </p>
+            {"<p style='font-size:0.9rem; font-style:italic; color:#cfcfcf; margin-top:10px;'>" + str(ow.get("analiza","")) + "</p>" if str(ow.get("analiza","")).strip() else ""}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 st.subheader("📊 Statystyki")
 zakres_wyboru = st.selectbox("Przedział czasowy", ["Ostatnie 7 dni", "Ostatni miesiąc", "Cały okres"], index=2)
@@ -233,6 +310,80 @@ col4.metric("Zysk / strata netto", f"£{zysk:+.2f}")
 col5.metric("Yield (ROI)", f"{yield_pct:+.1f}%")
 
 st.caption(f"Średni kurs zagranych kuponów: {sredni_kurs:.2f}")
+
+# --- Odznaki / mikro-osiągnięcia ---
+odznaki = []
+if liczba_werdyktow >= 10:
+    odznaki.append("🏅 10+ rozliczonych kuponów")
+if liczba_werdyktow >= 50:
+    odznaki.append("🏅 50+ rozliczonych kuponów")
+if liczba_werdyktow >= 100:
+    odznaki.append("🏅 100+ rozliczonych kuponów")
+
+if len(rozliczone_all) > 0:
+    seria_rozliczonych = rozliczone_all.sort_values("Data_dt")["Status"].tolist()
+    najdluzsza_wygrana, biezaca_wygrana = 0, 0
+    for s in seria_rozliczonych:
+        if s == "WYGRANA":
+            biezaca_wygrana += 1
+            najdluzsza_wygrana = max(najdluzsza_wygrana, biezaca_wygrana)
+        else:
+            biezaca_wygrana = 0
+    if najdluzsza_wygrana >= 3:
+        odznaki.append("🎯 Seria 3+ wygranych z rzędu")
+    if najdluzsza_wygrana >= 5:
+        odznaki.append("🎯 Seria 5+ wygranych z rzędu")
+
+    biezaca_seria, biezacy_status = 0, None
+    for s in reversed(seria_rozliczonych):
+        if biezacy_status is None:
+            biezacy_status = s
+            biezaca_seria = 1
+        elif s == biezacy_status:
+            biezaca_seria += 1
+        else:
+            break
+else:
+    biezaca_seria, biezacy_status = 0, None
+
+if yield_pct > 0 and suma_stawek > 0:
+    odznaki.append("📈 Dodatni yield w wybranym okresie")
+
+if odznaki:
+    st.markdown("**Odznaki:** " + "  ".join(
+        f"<span style='background-color:#2a2f3a; padding:4px 10px; border-radius:14px; margin-right:6px; font-size:0.85rem;'>{o}</span>"
+        for o in odznaki
+    ), unsafe_allow_html=True)
+
+if biezacy_status and biezaca_seria >= 2:
+    seria_emoji = "🔥" if biezacy_status == "WYGRANA" else "⚠️"
+    seria_slowo = "wygranych" if biezacy_status == "WYGRANA" else "przegranych"
+    st.caption(f"{seria_emoji} Aktualna seria: {biezaca_seria} {seria_slowo} z rzędu")
+
+st.divider()
+
+# --- Ranking najlepszych rynków ---
+st.subheader("🏆 Ranking rynków")
+if len(rozliczone_all) > 0:
+    ranking = rozliczone_all.groupby("Rynek").agg(
+        Kupony=("Status", "count"),
+        Wygrane=("Status", lambda x: (x == "WYGRANA").sum())
+    ).reset_index()
+    ranking = ranking[ranking["Kupony"] >= 2]
+    ranking["Win rate %"] = (ranking["Wygrane"] / ranking["Kupony"] * 100).round(0)
+    ranking = ranking.sort_values("Win rate %", ascending=False)
+
+    if len(ranking) > 0:
+        st.dataframe(
+            ranking.rename(columns={"Rynek": "Rynek"}),
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.info("Za mało danych, aby zbudować ranking rynków (min. 2 kupony na rynek).")
+else:
+    st.info("Brak rozliczonych kuponów do zbudowania rankingu.")
+
 st.divider()
 
 st.subheader("Najnowsze typy")
@@ -241,6 +392,8 @@ st.caption("Widoczne: 6 najnowszych typów + wszystkie ze statusem OPEN. Starsze
 if len(df_analizy) > 0:
     for _, row in df_analizy.sort_values("data", ascending=False).iterrows():
         kolor = STATUS_KOLOR.get(row["wynik"], "#3a3a3a")
+        if row["wynik"] == "OPEN":
+            st.markdown('<div class="kupon-open">', unsafe_allow_html=True)
         with st.container(border=True):
             c1, c2 = st.columns([3, 1])
             with c1:
@@ -261,6 +414,8 @@ if len(df_analizy) > 0:
 
             if str(row.get("analiza", "")).strip():
                 st.markdown(f"_{row['analiza']}_")
+        if row["wynik"] == "OPEN":
+            st.markdown('</div>', unsafe_allow_html=True)
 else:
     st.info("Brak zapisanych analiz — dodaj pierwszy typ poniżej.")
 
@@ -390,4 +545,55 @@ opcje_rynkow = [
 
 with st.container():
     col_a, col_b = st.columns(2)
-    data_input
+    data_input = col_a.date_input("Data meczu", value=datetime.today())
+    sport_input = col_b.selectbox("Sport", opcje_sportow)
+
+    col_c, col_d = st.columns(2)
+    mecz_input = col_c.text_input("Mecz", placeholder="np. Barcelona vs Inter")
+    rynek_input_analiza = col_d.selectbox("Rynek", opcje_rynkow)
+
+    col_e, col_f = st.columns(2)
+    pewnosc_input_analiza = col_e.selectbox("Poziom pewności", ["Pewny", "Sredni", "Ryzykowny"])
+    stawka_input = col_f.number_input("Stawka (GBP)", min_value=0.0, step=0.5)
+
+    kurs_input_analiza = st.number_input("Kurs WH", min_value=1.0, step=0.01)
+
+    analiza_input = st.text_area(
+        "Twoja analiza (opis po ludzku)",
+        placeholder="Tutaj wklej swoją analizę meczu w zwykłym języku..."
+    )
+
+    pin_input_dodaj = st.text_input("Kod PIN", type="password", max_chars=4, key="pin_dodaj")
+
+    if st.button("Zapisz typ i analizę"):
+        if pin_input_dodaj != st.secrets["APP_PIN"]:
+            st.error("Nieprawidłowy kod PIN. Typ nie został zapisany.")
+        elif not mecz_input or not analiza_input:
+            st.error("Uzupełnij co najmniej nazwę meczu i analizę.")
+        else:
+            nowy_wiersz = pd.DataFrame([{
+                "data": data_input.strftime("%Y-%m-%d"),
+                "sport": sport_input,
+                "mecz": mecz_input,
+                "rynek": rynek_input_analiza,
+                "pewnosc": pewnosc_input_analiza,
+                "stawka": f"{stawka_input:.2f}",
+                "kurs": f"{kurs_input_analiza:.2f}",
+                "wynik": "OPEN",
+                "analiza": analiza_input.replace("\n", " ").strip()
+            }])
+
+            content_now, sha_now = github_get("analizy.csv")
+            if content_now:
+                df_now = pd.read_csv(StringIO(content_now))
+            else:
+                df_now = pd.DataFrame(columns=["data","sport","mecz","rynek","pewnosc","stawka","kurs","wynik","analiza"])
+
+            df_now = pd.concat([df_now, nowy_wiersz], ignore_index=True)
+            buf = StringIO(); df_now.to_csv(buf, index=False)
+            r2 = github_put("analizy.csv", buf.getvalue(), sha_now, f"Dodano typ: {mecz_input}")
+
+            if r2.status_code in [200, 201]:
+                st.success("Typ i analiza zostały zapisane na GitHub (status: OPEN).")
+            else:
+                st.error(f"Błąd zapisu do GitHub: {r2.status_code} — {r2.text}")
