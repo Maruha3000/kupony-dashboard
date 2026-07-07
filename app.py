@@ -6,6 +6,7 @@ import random
 from datetime import datetime, timedelta
 import requests
 import base64
+import plotly.graph_objects as go
 
 st.set_page_config(page_title="Kupony Dashboard", layout="wide")
 
@@ -402,10 +403,58 @@ if len(rozliczone_all) > 0:
             use_container_width=True,
             hide_index=True
         )
+
+        fig_ranking = go.Figure()
+        ranking_sorted = ranking.sort_values("Win rate %", ascending=True)
+        fig_ranking.add_trace(go.Bar(
+            x=ranking_sorted["Win rate %"], y=ranking_sorted["Rynek"], orientation="h",
+            text=[f"{int(v)}%" for v in ranking_sorted["Win rate %"]], textposition="outside",
+            marker_color="#4a90e2"
+        ))
+        fig_ranking.update_layout(
+            title={"text": "Win rate rynków obstawianych przez Sędziego<br><span style='font-size: 14px; font-weight: normal; color:#9a9a9a;'>Rynki z min. 2 rozliczonymi zakładami</span>"},
+            font=dict(size=13),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color="#e0e0e0"
+        )
+        fig_ranking.update_xaxes(title_text="Win rate (%)", range=[0, 115], gridcolor="#333")
+        fig_ranking.update_yaxes(title_text="")
+        st.plotly_chart(fig_ranking, use_container_width=True)
     else:
         st.info("Za mało danych, aby zbudować ranking rynków (min. 2 kupony na rynek).")
 else:
     st.info("Brak rozliczonych kuponów do zbudowania rankingu.")
+
+st.divider()
+
+# --- Wykres trendu zysku w czasie ---
+st.subheader("📈 Trend zysku Sędziego")
+if len(rozliczone_all) > 0:
+    df_trend = rozliczone_all.sort_values("Data_dt").copy()
+    df_trend["PL"] = df_trend.apply(
+        lambda r: (r["Stawka"] * r["Kurs"] - r["Stawka"]) if r["Status"] == "WYGRANA" else -r["Stawka"],
+        axis=1
+    )
+    df_trend["Kumulatywny_zysk"] = df_trend["PL"].cumsum()
+
+    fig_trend = go.Figure()
+    fig_trend.add_trace(go.Scatter(
+        x=df_trend["Data_dt"], y=df_trend["Kumulatywny_zysk"],
+        mode="lines", fill="tozeroy", line=dict(width=3, color="#4a90e2")
+    ))
+    fig_trend.update_layout(
+        title={"text": "Skumulowany zysk Sędziego AI<br><span style='font-size: 14px; font-weight: normal; color:#9a9a9a;'>Trend banku po każdym rozliczonym kuponie</span>"},
+        font=dict(size=13),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font_color="#e0e0e0"
+    )
+    fig_trend.update_xaxes(title_text="Data", gridcolor="#333")
+    fig_trend.update_yaxes(title_text="Zysk (GBP)", gridcolor="#333")
+    st.plotly_chart(fig_trend, use_container_width=True)
+else:
+    st.info("Brak rozliczonych kuponów do zbudowania wykresu trendu.")
 
 st.divider()
 
