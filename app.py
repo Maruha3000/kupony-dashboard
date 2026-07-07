@@ -11,6 +11,26 @@ st.set_page_config(page_title="Kupony Dashboard", layout="wide")
 
 st.title("⚖️ Sędzia AI")
 st.markdown(
+    """
+    <div style='background-color:#1c1f26; padding:18px 22px; border-radius:10px; margin-top:15px; margin-bottom:10px; border-left:4px solid #4a90e2;'>
+        <p style='font-size:1rem; line-height:1.6; margin:0;'>
+        <b>Sędzia AI</b> nie opiera się na przeczuciach. Każdy werdykt to efekt głębokiego researchu —
+        system przeszukuje <b>X, Reddita, fora kibicowskie, media społecznościowe i najnowsze newsy</b>,
+        zbierając sygnały, które umykają zwykłemu analitykowi: nastroje kibiców, przecieki o składach,
+        formę zawodników i kontekst, który nie trafia do żadnych statystyk.
+        </p>
+        <p style='font-size:1rem; line-height:1.6; margin-top:10px;'>
+        Ale to nie wszystko. Sędzia <b>uczy się na własnych błędach i sukcesach</b> — każdy rozliczony kupon
+        trafia do archiwum jako dane treningowe. System z czasem coraz lepiej rozpoznaje, które typy rynków
+        i sytuacje faktycznie dają przewagę, a które tylko wyglądają obiecująco. To nie statyczny algorytm —
+        to proces, który z każdym dniem typowania staje się bardziej precyzyjny.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.markdown(
     "<p style='font-size:1.1rem; font-style:italic; margin-top:-10px;'>"
     "\"Nie szukamy typów.<br>Eliminujemy złe decyzje.\"</p>",
     unsafe_allow_html=True
