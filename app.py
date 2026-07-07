@@ -236,79 +236,6 @@ else:
     st.info("Brak zapisanych analiz — dodaj pierwszy typ poniżej.")
 
 st.divider()
-st.subheader("✏️ Dodaj nowy typ i analizę")
-
-opcje_sportow = [
-    "Pilka", "Tenis", "Hokej", "Koszykowka", "Siatkowka",
-    "Baseball", "Rugby", "Snooker", "Darts", "MMA/Boks", "Inne"
-]
-
-opcje_rynkow = [
-    "1X2 - Gospodarze", "1X2 - Remis", "1X2 - Gość",
-    "Over 0.5", "Under 0.5", "Over 1.5", "Under 1.5",
-    "Over 2.5", "Under 2.5", "Over 3.5", "Under 3.5",
-    "Over 4.5", "Under 4.5", "BTTS Yes", "BTTS No",
-    "Handicap -1", "Handicap -1.5", "Handicap -2",
-    "Handicap +1", "Handicap +1.5", "Handicap +2",
-    "Double Chance 1X", "Double Chance X2", "Double Chance 12",
-    "Win to Nil - Gospodarze", "Win to Nil - Gość",
-    "Correct Score", "Zwycięzca meczu (ML)",
-    "Over/Under sety", "Over/Under gemy",
-    "Over/Under punkty", "Over/Under goli w hokeju", "Inne"
-]
-
-with st.container():
-    col_a, col_b = st.columns(2)
-    data_input = col_a.date_input("Data meczu", value=datetime.today())
-    sport_input = col_b.selectbox("Sport", opcje_sportow)
-
-    col_c, col_d = st.columns(2)
-    mecz_input = col_c.text_input("Mecz", placeholder="np. Barcelona vs Inter")
-    rynek_input_analiza = col_d.selectbox("Rynek", opcje_rynkow)
-
-    col_e, col_f = st.columns(2)
-    pewnosc_input_analiza = col_e.selectbox("Poziom pewności", ["Pewny", "Sredni", "Ryzykowny"])
-    stawka_input = col_f.number_input("Stawka (GBP)", min_value=0.0, step=0.5)
-
-    kurs_input_analiza = st.number_input("Kurs WH", min_value=1.0, step=0.01)
-
-    analiza_input = st.text_area(
-        "Twoja analiza (opis po ludzku)",
-        placeholder="Tutaj wklej swoją analizę meczu w zwykłym języku..."
-    )
-
-    if st.button("Zapisz typ i analizę"):
-        if not mecz_input or not analiza_input:
-            st.error("Uzupełnij co najmniej nazwę meczu i analizę.")
-        else:
-            nowy_wiersz = pd.DataFrame([{
-                "data": data_input.strftime("%Y-%m-%d"),
-                "sport": sport_input,
-                "mecz": mecz_input,
-                "rynek": rynek_input_analiza,
-                "pewnosc": pewnosc_input_analiza,
-                "stawka": f"{stawka_input:.2f}",
-                "kurs": f"{kurs_input_analiza:.2f}",
-                "wynik": "OPEN",
-                "analiza": analiza_input.replace("\n", " ").strip()
-            }])
-
-            content_now, sha_now = github_get("analizy.csv")
-            if content_now:
-                df_now = pd.read_csv(StringIO(content_now))
-            else:
-                df_now = pd.DataFrame(columns=["data","sport","mecz","rynek","pewnosc","stawka","kurs","wynik","analiza"])
-
-            df_now = pd.concat([df_now, nowy_wiersz], ignore_index=True)
-            buf = StringIO(); df_now.to_csv(buf, index=False)
-            r2 = github_put("analizy.csv", buf.getvalue(), sha_now, f"Dodano typ: {mecz_input}")
-
-            if r2.status_code in [200, 201]:
-                st.success("Typ i analiza zostały zapisane na GitHub (status: OPEN).")
-            else:
-                st.error(f"Błąd zapisu do GitHub: {r2.status_code} — {r2.text}")
-
-st.divider()
 st.subheader("💰 Kalkulator bezpiecznej stawki")
 
 st.write("Wpisz swój aktualny bank, a system podliczy bezpieczną stawkę na podstawie zasad ochrony kapitału.")
@@ -373,7 +300,7 @@ if len(df_analizy) > 0:
 
     wybrany_mecz = st.selectbox("Wybierz kupon do zmiany", opcje_meczow)
     nowy_status = st.selectbox("Nowy status", ["OPEN", "WYGRANA", "PRZEGRANA"])
-    pin_input = st.text_input("Kod PIN", type="password", max_chars=4)
+    pin_input = st.text_input("Kod PIN", type="password", max_chars=4, key="pin_status")
 
     if st.button("Zapisz zmianę"):
         if pin_input != st.secrets["APP_PIN"]:
@@ -408,3 +335,81 @@ if len(df_analizy) > 0:
                     st.error(f"Błąd zapisu do GitHub: {r2.status_code} — {r2.text}")
 else:
     st.info("Brak kuponów do edycji.")
+
+st.divider()
+st.subheader("Dodaj typ")
+st.caption("Dodanie typu wymaga podania kodu PIN.")
+
+opcje_sportow = [
+    "Pilka", "Tenis", "Hokej", "Koszykowka", "Siatkowka",
+    "Baseball", "Rugby", "Snooker", "Darts", "MMA/Boks", "Inne"
+]
+
+opcje_rynkow = [
+    "1X2 - Gospodarze", "1X2 - Remis", "1X2 - Gość",
+    "Over 0.5", "Under 0.5", "Over 1.5", "Under 1.5",
+    "Over 2.5", "Under 2.5", "Over 3.5", "Under 3.5",
+    "Over 4.5", "Under 4.5", "BTTS Yes", "BTTS No",
+    "Handicap -1", "Handicap -1.5", "Handicap -2",
+    "Handicap +1", "Handicap +1.5", "Handicap +2",
+    "Double Chance 1X", "Double Chance X2", "Double Chance 12",
+    "Win to Nil - Gospodarze", "Win to Nil - Gość",
+    "Correct Score", "Zwycięzca meczu (ML)",
+    "Over/Under sety", "Over/Under gemy",
+    "Over/Under punkty", "Over/Under goli w hokeju", "Inne"
+]
+
+with st.container():
+    col_a, col_b = st.columns(2)
+    data_input = col_a.date_input("Data meczu", value=datetime.today())
+    sport_input = col_b.selectbox("Sport", opcje_sportow)
+
+    col_c, col_d = st.columns(2)
+    mecz_input = col_c.text_input("Mecz", placeholder="np. Barcelona vs Inter")
+    rynek_input_analiza = col_d.selectbox("Rynek", opcje_rynkow)
+
+    col_e, col_f = st.columns(2)
+    pewnosc_input_analiza = col_e.selectbox("Poziom pewności", ["Pewny", "Sredni", "Ryzykowny"])
+    stawka_input = col_f.number_input("Stawka (GBP)", min_value=0.0, step=0.5)
+
+    kurs_input_analiza = st.number_input("Kurs WH", min_value=1.0, step=0.01)
+
+    analiza_input = st.text_area(
+        "Twoja analiza (opis po ludzku)",
+        placeholder="Tutaj wklej swoją analizę meczu w zwykłym języku..."
+    )
+
+    pin_input_dodaj = st.text_input("Kod PIN", type="password", max_chars=4, key="pin_dodaj")
+
+    if st.button("Zapisz typ i analizę"):
+        if pin_input_dodaj != st.secrets["APP_PIN"]:
+            st.error("Nieprawidłowy kod PIN. Typ nie został zapisany.")
+        elif not mecz_input or not analiza_input:
+            st.error("Uzupełnij co najmniej nazwę meczu i analizę.")
+        else:
+            nowy_wiersz = pd.DataFrame([{
+                "data": data_input.strftime("%Y-%m-%d"),
+                "sport": sport_input,
+                "mecz": mecz_input,
+                "rynek": rynek_input_analiza,
+                "pewnosc": pewnosc_input_analiza,
+                "stawka": f"{stawka_input:.2f}",
+                "kurs": f"{kurs_input_analiza:.2f}",
+                "wynik": "OPEN",
+                "analiza": analiza_input.replace("\n", " ").strip()
+            }])
+
+            content_now, sha_now = github_get("analizy.csv")
+            if content_now:
+                df_now = pd.read_csv(StringIO(content_now))
+            else:
+                df_now = pd.DataFrame(columns=["data","sport","mecz","rynek","pewnosc","stawka","kurs","wynik","analiza"])
+
+            df_now = pd.concat([df_now, nowy_wiersz], ignore_index=True)
+            buf = StringIO(); df_now.to_csv(buf, index=False)
+            r2 = github_put("analizy.csv", buf.getvalue(), sha_now, f"Dodano typ: {mecz_input}")
+
+            if r2.status_code in [200, 201]:
+                st.success("Typ i analiza zostały zapisane na GitHub (status: OPEN).")
+            else:
+                st.error(f"Błąd zapisu do GitHub: {r2.status_code} — {r2.text}")
