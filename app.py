@@ -86,6 +86,29 @@ status_dnia_placeholder = st.empty()
 licznik_placeholder = st.empty()
 ostatni_werdykt_placeholder = st.empty()
 
+st.markdown(
+    """
+    <div style='background: linear-gradient(90deg, #1c1f26, #232838); border:1px dashed #4a90e2;
+                border-radius:10px; padding:12px 18px; margin:10px 0 6px 0; text-align:center;'>
+        <span style='font-size:0.92rem; color:#9fc2ec;'>
+            🔧 <b>Sąd w budowie:</b> wkrótce będziesz mógł zadać Sędziemu własne pytanie i otrzymać werdykt na żywo — Sędzia już się do tego szykuje.
+        </span>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+col_zapytaj1, col_zapytaj2 = st.columns([4, 1])
+col_zapytaj1.text_input(
+    "Zapytaj Sędziego",
+    placeholder="np. Czy warto obstawić Over 2.5 w meczu X vs Y?",
+    disabled=True,
+    label_visibility="collapsed"
+)
+col_zapytaj2.button("Zapytaj", disabled=True, use_container_width=True)
+st.caption("🔒 Funkcja pytań do Sędziego jest jeszcze w budowie.")
+st.divider()
+
 czerwiec_data = """Data,Sport,Rozgrywki,Mecz,Rynek,Pewnosc,Stawka,Kurs,Godzina,Status
 03.06.2026,Pilka,Friendly,Poland vs Nigeria,Over 2.5 goli,Ryzykowny,0.50,2.00,19:45,WYGRANA
 03.06.2026,Tenis,ATP Roland Garros,Berrettini vs Arnaldi,Berrettini to win,Ryzykowny,0.50,1.50,19:15,PRZEGRANA
