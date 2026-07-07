@@ -9,33 +9,36 @@ import base64
 
 st.set_page_config(page_title="Kupony Dashboard", layout="wide")
 
-st.title("⚖️ Sędzia AI")
 st.markdown(
     """
-    <div style='background-color:#1c1f26; padding:18px 22px; border-radius:10px; margin-top:15px; margin-bottom:10px; border-left:4px solid #4a90e2;'>
-        <p style='font-size:1rem; line-height:1.6; margin:0;'>
-        <b>Sędzia AI</b> nie opiera się na przeczuciach. Każdy werdykt to efekt głębokiego researchu —
-        system przeszukuje <b>X, Reddita, fora kibicowskie, media społecznościowe i najnowsze newsy</b>,
-        zbierając sygnały, które umykają zwykłemu analitykowi: nastroje kibiców, przecieki o składach,
-        formę zawodników i kontekst, który nie trafia do żadnych statystyk.
+    <div style='text-align:center; padding: 12px 10px 6px 10px;'>
+        <h1 style='font-size:2.3rem; margin-bottom:6px; line-height:1.2;'>⚖️ Sędzia AI</h1>
+        <p style='font-size:1.05rem; font-style:italic; color:#b0b0b0; margin:0 0 4px 0; line-height:1.4;'>
+            "Nie szukamy typów.<br>Eliminujemy złe decyzje."
         </p>
-        <p style='font-size:1rem; line-height:1.6; margin-top:10px;'>
-        Ale to nie wszystko. Sędzia <b>uczy się na własnych błędach i sukcesach</b> — każdy rozliczony kupon
-        trafia do archiwum jako dane treningowe. System z czasem coraz lepiej rozpoznaje, które typy rynków
-        i sytuacje faktycznie dają przewagę, a które tylko wyglądają obiecująco. To nie statyczny algorytm —
-        to proces, który z każdym dniem typowania staje się bardziej precyzyjny.
+        <p style='font-size:0.9rem; color:#8a8a8a; margin-top:4px;'>
+            System wydawania werdyktów dla zakładów sportowych
+        </p>
+    </div>
+
+    <div style='background-color:#1c1f26; padding:20px; border-radius:12px;
+                margin:18px auto; max-width:800px; border-left:4px solid #4a90e2;'>
+        <p style='font-size:0.95rem; line-height:1.65; margin:0; color:#e0e0e0;'>
+        <b style='color:#4a90e2;'>Sędzia AI</b> nie opiera się na przeczuciach. Każdy werdykt to efekt
+        głębokiego researchu — system przeszukuje <b>X, Reddita, fora kibicowskie, media społecznościowe
+        i najnowsze newsy</b>, zbierając sygnały, które umykają zwykłemu analitykowi: nastroje kibiców,
+        przecieki o składach, formę zawodników i kontekst niewidoczny w statystykach.
+        </p>
+        <p style='font-size:0.95rem; line-height:1.65; margin-top:14px; margin-bottom:0; color:#e0e0e0;'>
+        System <b style='color:#4a90e2;'>uczy się na własnych błędach i sukcesach</b> — każdy rozliczony
+        kupon trafia do archiwum jako dane treningowe. Z czasem coraz lepiej rozpoznaje, które typy rynków
+        faktycznie dają przewagę, a które tylko wyglądają obiecująco.
         </p>
     </div>
     """,
     unsafe_allow_html=True
 )
 
-st.markdown(
-    "<p style='font-size:1.1rem; font-style:italic; margin-top:-10px;'>"
-    "\"Nie szukamy typów.<br>Eliminujemy złe decyzje.\"</p>",
-    unsafe_allow_html=True
-)
-st.caption("Sędzia AI – system wydawania werdyktów dla zakładów sportowych.")
 MIESIACE_PL = {1:"Styczeń",2:"Luty",3:"Marzec",4:"Kwiecień",5:"Maj",6:"Czerwiec",
                7:"Lipiec",8:"Sierpień",9:"Wrzesień",10:"Październik",11:"Listopad",12:"Grudzień"}
 
@@ -387,55 +390,4 @@ opcje_rynkow = [
 
 with st.container():
     col_a, col_b = st.columns(2)
-    data_input = col_a.date_input("Data meczu", value=datetime.today())
-    sport_input = col_b.selectbox("Sport", opcje_sportow)
-
-    col_c, col_d = st.columns(2)
-    mecz_input = col_c.text_input("Mecz", placeholder="np. Barcelona vs Inter")
-    rynek_input_analiza = col_d.selectbox("Rynek", opcje_rynkow)
-
-    col_e, col_f = st.columns(2)
-    pewnosc_input_analiza = col_e.selectbox("Poziom pewności", ["Pewny", "Sredni", "Ryzykowny"])
-    stawka_input = col_f.number_input("Stawka (GBP)", min_value=0.0, step=0.5)
-
-    kurs_input_analiza = st.number_input("Kurs WH", min_value=1.0, step=0.01)
-
-    analiza_input = st.text_area(
-        "Twoja analiza (opis po ludzku)",
-        placeholder="Tutaj wklej swoją analizę meczu w zwykłym języku..."
-    )
-
-    pin_input_dodaj = st.text_input("Kod PIN", type="password", max_chars=4, key="pin_dodaj")
-
-    if st.button("Zapisz typ i analizę"):
-        if pin_input_dodaj != st.secrets["APP_PIN"]:
-            st.error("Nieprawidłowy kod PIN. Typ nie został zapisany.")
-        elif not mecz_input or not analiza_input:
-            st.error("Uzupełnij co najmniej nazwę meczu i analizę.")
-        else:
-            nowy_wiersz = pd.DataFrame([{
-                "data": data_input.strftime("%Y-%m-%d"),
-                "sport": sport_input,
-                "mecz": mecz_input,
-                "rynek": rynek_input_analiza,
-                "pewnosc": pewnosc_input_analiza,
-                "stawka": f"{stawka_input:.2f}",
-                "kurs": f"{kurs_input_analiza:.2f}",
-                "wynik": "OPEN",
-                "analiza": analiza_input.replace("\n", " ").strip()
-            }])
-
-            content_now, sha_now = github_get("analizy.csv")
-            if content_now:
-                df_now = pd.read_csv(StringIO(content_now))
-            else:
-                df_now = pd.DataFrame(columns=["data","sport","mecz","rynek","pewnosc","stawka","kurs","wynik","analiza"])
-
-            df_now = pd.concat([df_now, nowy_wiersz], ignore_index=True)
-            buf = StringIO(); df_now.to_csv(buf, index=False)
-            r2 = github_put("analizy.csv", buf.getvalue(), sha_now, f"Dodano typ: {mecz_input}")
-
-            if r2.status_code in [200, 201]:
-                st.success("Typ i analiza zostały zapisane na GitHub (status: OPEN).")
-            else:
-                st.error(f"Błąd zapisu do GitHub: {r2.status_code} — {r2.text}")
+    data_input
