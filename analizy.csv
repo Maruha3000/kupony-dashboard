@@ -2,7 +2,7 @@ data,sport,mecz,rynek,pewnosc,stawka,kurs,wynik,analiza
 2026-07-20,Pilka,Botev Plovdiv v Lokomotiv Sofia,Zwycięzca meczu: Botev Plovdiv,Średni,100.0,1.75,OPEN,.
 2026-07-20,Pilka,Botev Plovdiv v Lokomotiv Sofia,Gole — suma meczu: Over 1.5 goli,Pewny,150.0,1.25,OPEN,.
 2026-07-20,Pilka,Mariehamn v Lahti,Zwycięzca meczu: Lahti,Średni,100.0,1.57,OPEN,.
-2026-07-20,Pilka,Suduva v Hegelmann Litauen,Zwycięzca meczu: Suduva,Pewny,150.0,1.65,OPEN,.
+2026-07-20,Pilka,Suduva v Hegelmann Litauen,Zwycięzca meczu: Suduva,Pewny,150.0,1.65,WYGRANA,.
 2026-07-20,Pilka,Norrby v GIF Sundsvall,Zwycięzca meczu: Norrby,Średni,100.0,1.95,OPEN,.
 2026-07-20,Pilka,Norrby v GIF Sundsvall,Gole — suma meczu: Under 2.5 goli,Średni,100.0,1.85,OPEN,.
 2026-07-20,Pilka,Kalmar v Malmo,Zwycięzca meczu: Malmo,Ryzykowny,50.0,2.4,OPEN,.
